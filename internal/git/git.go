@@ -9,6 +9,14 @@ import (
 	"strings"
 )
 
+func ConfigureSafeDirectory(repoPath string) error {
+	// git config --global --add safe.directory "*"
+	// This is safe to run multiple times
+	cmd := exec.Command("git", "config", "--global", "--add", "safe.directory", "*")
+	// Use an absolute path if possible, but '*' is easiest for multi-volume setups
+	return cmd.Run()
+}
+
 func Init(repoPath string) error {
 	cmd := exec.Command("git", "init")
 	cmd.Dir = repoPath
@@ -24,11 +32,13 @@ func Init(repoPath string) error {
 		c := exec.Command("git", args...)
 		c.Dir = repoPath
 		if err := c.Run(); err != nil {
+			// for global config, Dir might not strictly matter as much but let's keep it consistent
 			return err
 		}
 	}
 	return nil
 }
+
 
 type BlameLine struct {
 	Timestamp int64

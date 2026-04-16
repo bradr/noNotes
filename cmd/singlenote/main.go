@@ -19,7 +19,12 @@ func main() {
 	fileName := "notes.md"
 	dbPath := "singlenote.db"
 
-	// Create notes dir if it doesn't exist
+	// 1. Configure safe directory for Docker/Volume scenarios
+	if err := git.ConfigureSafeDirectory(repoPath); err != nil {
+		log.Printf("Warning: failed to configure git safe directory: %v", err)
+	}
+
+	// 2. Create notes dir if it doesn't exist
 	if _, err := os.Stat(filepath.Join(repoPath, ".git")); os.IsNotExist(err) {
 		log.Println("Initializing new git repository in", repoPath)
 		if err := os.MkdirAll(repoPath, 0755); err != nil {

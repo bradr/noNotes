@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>noNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <script>
+        // Inline script to prevent theme flash
+        (function () {
+            const theme = localStorage.getItem('theme');
+            if (theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+            }
+        })();
+    </script>
+</head>
+
+<body>
+
+    <div id="app">
+        <div id="main-content">
+            <!-- Header Banner -->
+            <header id="main-header">
+                <div class="logo-container">
+                    <svg class="logo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span class="logo-text">no-Notes</span>
+                </div>
+
+                <div class="header-actions">
+                    <!-- Search Button -->
+                    <button id="btn-search" aria-label="Focus search" title="Search (Cmd+F)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+
+                    <!-- Add Note Button -->
+                    <button id="btn-add-note" aria-label="Add note" title="Add note" onclick="window.addNewNote()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </button>
+
+                    <!-- Theme Toggle -->
+                    <button id="btn-theme" aria-label="Toggle theme">
+                        <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <div id="main-workspace">
+                <!-- Editor -->
+                <div id="editor-container"></div>
+            </div>
+        </div>
+
+        <!-- Side Panel (Permanent, Full Vertical) -->
+        <aside id="side-panel">
+            <div class="side-panel-header">
+                <div class="search-wrapper">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="search-input" placeholder="Filter notes..." autocomplete="off">
+                    <span id="search-count">0 results</span>
+                </div>
+                <button id="btn-clear-search" aria-label="Clear search" title="Clear search">✕</button>
+            </div>
+
+            <!-- Calendar Widget -->
+            <div id="calendar-widget">
+                <div class="calendar-header">
+                    <button id="cal-prev" class="cal-btn">❮</button>
+                    <span id="cal-month-year"></span>
+                    <button id="cal-next" class="cal-btn">❯</button>
+                </div>
+                <div class="calendar-grid-header">
+                    <div>S</div>
+                    <div>M</div>
+                    <div>T</div>
+                    <div>W</div>
+                    <div>T</div>
+                    <div>F</div>
+                    <div>S</div>
+                </div>
+                <div id="calendar-grid" class="calendar-grid"></div>
+            </div>
+
+            <div id="task-panel-header">
+                <span id="task-panel-title">To Do</span>
+            </div>
+            <div id="task-list" hx-get="/tasks" hx-trigger="load, update-tasks">
+            </div>
+        </aside>
+    </div>
+
+
+    <div id="date-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3>Edit Line Dates</h3>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label>Created Date</label>
+                    <input type="date" id="edit-created-at">
+                </div>
+                <div class="input-group">
+                    <label>Modified Date</label>
+                    <input type="date" id="edit-modified-at">
+                </div>
+                <p id="edit-line-info"></p>
+            </div>
+            <div class="modal-actions">
+                <button id="edit-cancel" class="btn-secondary">Cancel</button>
+                <button id="edit-save" class="btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/static/js/editor.js?v=2"></script>
+
+    <script>
+        // ... previous scripts ...
+        let editingLineNum = null;
+
+        window.openDateModal = async (lineNum) => {
+            editingLineNum = lineNum;
+            try {
+                const res = await fetch(`/line/get?line=${lineNum}`);
+                const data = await res.json();
+
+                // Convert unix timestamps to YYYY-MM-DD (Local Time)
+                const toDateStr = (ts) => {
+                    const d = new Date(ts * 1000);
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                };
+
+                document.getElementById('edit-created-at').value = toDateStr(data.created_at);
+                document.getElementById('edit-modified-at').value = toDateStr(data.timestamp);
+                document.getElementById('edit-line-info').textContent = `Editing Line ${lineNum}: "${data.text.substring(0, 30)}..."`;
+
+                document.getElementById('date-modal').style.display = 'flex';
+            } catch (e) {
+                console.error("Failed to load line data", e);
+            }
+        };
+
+        document.getElementById('edit-cancel').onclick = () => {
+            document.getElementById('date-modal').style.display = 'none';
+        }
+
+        document.getElementById('edit-save').onclick = async () => {
+            const createdAt = new Date(document.getElementById('edit-created-at').value).getTime() / 1000;
+            const modifiedAt = new Date(document.getElementById('edit-modified-at').value).getTime() / 1000;
+
+            const formData = new URLSearchParams();
+            formData.append('line', editingLineNum);
+            formData.append('created_at', Math.floor(createdAt));
+            formData.append('modified_at', Math.floor(modifiedAt));
+
+            try {
+                const res = await fetch('/line/update-date', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (res.ok) {
+                    document.getElementById('date-modal').style.display = 'none';
+                    fetchActivity(); // Refresh calendar
+                    // Also trigger a refresh of the hover labels in editor if possible (though repo history reload will do it)
+                    if (window.dispatchEvent) window.dispatchEvent(new Event('update'));
+                }
+            } catch (e) {
+                console.error("Failed to update line", e);
+            }
+        }
+
+        const searchInput = document.getElementById('search-input');
+
+        document.getElementById('btn-clear-search').addEventListener('click', () => {
+            if (window.clearSearch) window.clearSearch();
+        });
+
+
+        // Theme switching logic
+        const btnTheme = document.getElementById('btn-theme');
+        btnTheme.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            let nextTheme = 'dark';
+
+            // If current is dark or unset but prefers-color-scheme is dark
+            if (currentTheme === 'dark' || (!currentTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                nextTheme = 'light';
+            }
+
+            document.documentElement.setAttribute('data-theme', nextTheme);
+            localStorage.setItem('theme', nextTheme);
+        });
+
+        // Search button logic
+        const btnSearch = document.getElementById('btn-search');
+
+        btnSearch.addEventListener('click', () => {
+            searchInput.focus();
+            searchInput.select();
+        });
+
+        // Global Cmd-F shortcut to focus search (Capture phase to override CodeMirror)
+        window.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+                e.preventDefault();
+                e.stopPropagation();
+                searchInput.focus();
+                searchInput.select();
+            }
+        }, true);
+
+        // ─── Calendar Logic ──────────────────────────────────────────────
+        let currentCalDate = new Date();
+        let activityData = { created: {}, modified: {} };
+
+        async function fetchActivity() {
+            renderCalendar(); // Initial render
+            try {
+                const response = await fetch('/activity');
+                if (!response.ok) throw new Error('Fetch failed');
+                activityData = await response.json();
+                renderCalendar();
+            } catch (e) {
+                console.error("Activity fetch failed", e);
+                renderCalendar();
+            }
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const monthYearLabel = document.getElementById('cal-month-year');
+            grid.innerHTML = '';
+
+            const year = currentCalDate.getFullYear();
+            const month = currentCalDate.getMonth();
+            const monthLabel = currentCalDate.toLocaleString('default', { month: 'long' });
+            monthYearLabel.textContent = `${monthLabel} ${year}`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Padding for first day of month
+            for (let i = 0; i < firstDay; i++) {
+                grid.appendChild(document.createElement('div'));
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'calendar-day';
+                dayDiv.textContent = d;
+
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+                const createdLine = activityData.created[dateStr];
+                const modifiedLine = activityData.modified[dateStr];
+
+                if (createdLine !== undefined) {
+                    dayDiv.classList.add('has-creation');
+                    dayDiv.title = `Initial notes on ${dateStr}`;
+                } else if (modifiedLine !== undefined) {
+                    dayDiv.classList.add('has-modification');
+                    dayDiv.title = `Edits on ${dateStr}`;
+                }
+
+                if (createdLine !== undefined || modifiedLine !== undefined) {
+                    dayDiv.onclick = () => {
+                        const lineNum = createdLine !== undefined ? createdLine : modifiedLine;
+                        if (window.scrollToLine) {
+                            window.scrollToLine(lineNum);
+                        }
+                    };
+                }
+
+                grid.appendChild(dayDiv);
+            }
+        }
+
+        document.getElementById('cal-prev').onclick = () => {
+            currentCalDate.setMonth(currentCalDate.getMonth() - 1);
+            renderCalendar();
+        };
+        document.getElementById('cal-next').onclick = () => {
+            currentCalDate.setMonth(currentCalDate.getMonth() + 1);
+            renderCalendar();
+        };
+
+        fetchActivity();
+
+        // Register with HTMX to refresh activity on note changes
+        document.body.addEventListener('htmx:afterOnLoad', (e) => {
+            // If the event came from an append or update
+            if (e.detail.requestConfig.path === '/append' || e.detail.requestConfig.path === '/update') {
+                fetchActivity();
+            }
+        });
+
+        // The SSE events should also trigger calendar refresh
+        document.body.addEventListener('update', fetchActivity);
+    </script>
+</body>
+
+</html>

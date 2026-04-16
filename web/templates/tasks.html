@@ -1,0 +1,22 @@
+{{ range . }}
+<div class="task-item {{if .Done}}done{{end}}" {{ if .Context }}data-context="{{.Context}}"{{ end }}>
+    <input type="checkbox" 
+           hx-post="/tasks/toggle" 
+           hx-swap="none"
+           hx-vals='{"line": {{.LineNum}}}'
+           {{if .Done}}checked{{end}}>
+    <div class="task-content">
+        <span class="task-text">{{.Text}}</span>
+        <span class="task-date">{{ formatDate .Timestamp }}</span>
+    </div>
+    <button class="btn-jump" onclick="window.scrollToLine({{.LineNum}})" title="Jump to line">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+    </button>
+</div>
+{{ else }}
+<div class="empty-state">No open tasks! Inbox zero.</div>
+{{ end }}

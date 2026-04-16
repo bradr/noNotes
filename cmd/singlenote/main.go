@@ -1,0 +1,55 @@
+package main
+
+import (
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/bradr/singlenote/internal/api"
+	"github.com/bradr/singlenote/internal/indexer"
+	"github.com/bradr/singlenote/internal/watcher"
+)
+
+func main() {
+	// Let's ensure the repo paths exist
+	repoPath := "notes"
+	fileName := "notes.md"
+	dbPath := "singlenote.db"
+
+	// Create notes dir if it doesn't exist
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		log.Fatal(err)
+	}
+
+	// Create notes.md if it doesn't exist
+	fullFilePath := filepath.Join(repoPath, fileName)
+	if _, err := os.Stat(fullFilePath); os.IsNotExist(err) {
+		if err := os.WriteFile(fullFilePath, []byte("# SingleNote Init\n"), 0644); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	idx, err := indexer.New(dbPath)
+	if err != nil {
+		log.Fatalf("Failed to initialize indexer: %v", err)
+	}
+
+	w := watcher.New(repoPath, fileName, idx, 2*time.Second)
+	if err := w.Start(); err != nil {
+		log.Fatalf("Failed to start watcher: %v", err)
+	}
+
+	server, err := api.New(repoPath, fileName, idx, w)
+	if err != nil {
+		log.Fatalf("Failed to initialize API server: %v", err)
+	}
+
+	handler := server.SetupRoutes()
+
+	log.Println("Starting noNotes server on http://localhost:8080")
+	if err := http.ListenAndServe(":8080", handler); err != nil {
+		log.Fatal(err)
+	}
+}

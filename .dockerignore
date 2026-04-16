@@ -1,0 +1,11 @@
+.git
+.DS_Store
+.env*
+e2e/
+scripts/
+test-results/
+playwright-report/
+*.db
+*.log
+node_modules/
+singlenote

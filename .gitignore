@@ -1,0 +1,15 @@
+nodes/*
+notes-example
+.DS_Store
+internal/git/testdata/test-blame
+test-blame
+.env
+.env.local
+playwright-report/
+test-results/
+e2e/playwright-report/
+e2e/test-results/
+e2e/scripts/repro_*_
+e2e/node_modules
+singlenote.db
+PRD.md

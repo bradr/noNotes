@@ -9,6 +9,27 @@ import (
 	"strings"
 )
 
+func Init(repoPath string) error {
+	cmd := exec.Command("git", "init")
+	cmd.Dir = repoPath
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	// Configure git so commit doesn't fail
+	for _, args := range [][]string{
+		{"config", "user.email", "you@example.com"},
+		{"config", "user.name", "noNotes"},
+	} {
+		c := exec.Command("git", args...)
+		c.Dir = repoPath
+		if err := c.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type BlameLine struct {
 	Timestamp int64
 	Text      string

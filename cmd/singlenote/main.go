@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/bradr/singlenote/internal/api"
+	"github.com/bradr/singlenote/internal/git"
 	"github.com/bradr/singlenote/internal/indexer"
 	"github.com/bradr/singlenote/internal/watcher"
 )
@@ -19,9 +20,16 @@ func main() {
 	dbPath := "singlenote.db"
 
 	// Create notes dir if it doesn't exist
-	if err := os.MkdirAll(repoPath, 0755); err != nil {
-		log.Fatal(err)
+	if _, err := os.Stat(filepath.Join(repoPath, ".git")); os.IsNotExist(err) {
+		log.Println("Initializing new git repository in", repoPath)
+		if err := os.MkdirAll(repoPath, 0755); err != nil {
+			log.Fatal(err)
+		}
+		if err := git.Init(repoPath); err != nil {
+			log.Fatalf("Failed to initialize git: %v", err)
+		}
 	}
+
 
 	// Create notes.md if it doesn't exist
 	fullFilePath := filepath.Join(repoPath, fileName)

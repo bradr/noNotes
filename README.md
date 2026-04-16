@@ -7,8 +7,10 @@ noNotes is a minimalist, append-only note-taking application designed for a dist
 - **Minimalist Editor**: Focused on writing with seamless formatting.
 - **Append-Only Workflow**: Encourages continuous thought capture.
 - **Visual Timeline**: Uses a calendar to navigate your notes history.
-- **Git Integration**: Every change is tracked via an internal Git repository.
+- **Git Integration**: Every change is tracked via an internal Git repository. The app automatically initializes a new repository if one isn't found.
+- **Auto-Initialization**: On first run, a default `notes.md` is created and the Git repository/SQLite database are automatically configured.
 - **Real-Time Sync**: Automatically reflects changes made externally to your `notes.md` file.
+
 
 ## Tech Stack
 

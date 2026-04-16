@@ -1,8 +1,10 @@
 # Stage 1: Builder
 FROM golang:1.24-alpine AS builder
 
-# Install build dependencies for go-sqlite3 (CGO)
-RUN apk add --no-cache gcc musl-dev
+# Install build dependencies:
+# - gcc/musl-dev for go-sqlite3 (CGO)
+# - git for repository initialization
+RUN apk add --no-cache gcc musl-dev git
 
 WORKDIR /app
 

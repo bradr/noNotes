@@ -14,12 +14,13 @@ let isRemoteUpdate = false;
 // ─── Command Palette ─────────────────────────────────────────────────────────
 
 const paletteItems = [
-    { label: "Checklist", prefix: "- [ ] " },
-    { label: "Heading 1", prefix: "# " },
-    { label: "Heading 2", prefix: "## " },
-    { label: "Bullet List", prefix: "- " },
-    { label: "Blockquote", prefix: "> " },
-    { label: "Code Block", prefix: "```\n\n```", offset: 4 }
+    { label: "Checklist", prefix: "- [ ] ", icon: "□" },
+    { label: "Heading 1", prefix: "# ", icon: "H1" },
+    { label: "Heading 2", prefix: "## ", icon: "H2" },
+    { label: "Heading 3", prefix: "### ", icon: "H3" },
+    { label: "Bullet List", prefix: "- ", icon: "•" },
+    { label: "Blockquote", prefix: "> ", icon: "“" },
+    { label: "Code Block", prefix: "```\n\n```", offset: 4, icon: "</>" }
 ];
 
 let paletteActive = false;
@@ -37,10 +38,22 @@ function setupCommandPalette() {
 function updatePaletteUI() {
     if (!paletteEl) return;
     paletteEl.innerHTML = '';
+    
     paletteItems.forEach((item, i) => {
         const div = document.createElement('div');
         div.className = `palette-item ${i === paletteIndex ? 'active' : ''}`;
-        div.textContent = item.label;
+        
+        const icon = document.createElement('span');
+        icon.className = 'palette-icon';
+        icon.textContent = item.icon;
+        
+        const label = document.createElement('span');
+        label.className = 'palette-label';
+        label.textContent = item.label;
+        
+        div.appendChild(icon);
+        div.appendChild(label);
+
         div.onmousedown = (e) => {
             e.preventDefault(); // Prevents editor from losing focus
             paletteIndex = i;
@@ -63,16 +76,31 @@ document.addEventListener('mousedown', (e) => {
 
 function applyPaletteSelection(view) {
     if (!paletteActive || !view) return;
-    const item = paletteItems[paletteIndex];
+    
     const head = view.state.selection.main.head;
+    const line = view.state.doc.lineAt(head);
+    const slashPos = head - 1;
+    const item = paletteItems[paletteIndex];
 
-    // Replace the "/" with the prefix
-    const from = head - 1;
-    view.dispatch({
-        changes: { from: from, to: head, insert: item.prefix },
-        selection: { anchor: from + (item.offset || item.prefix.length) },
-        userEvent: 'input.type'
-    });
+    if (item.offset) {
+        // Block-style insert (like Code Block), replace the trigger "/"
+        view.dispatch({
+            changes: { from: slashPos, to: head, insert: item.prefix },
+            selection: { anchor: slashPos + item.offset },
+            userEvent: 'input.type'
+        });
+    } else {
+        // Line-style prefix (Heading, Checklist, etc.)
+        view.dispatch({
+            changes: [
+                { from: slashPos, to: head, insert: "" },
+                { from: line.from, to: line.from, insert: item.prefix }
+            ],
+            // Adjust selection to maintain relative position
+            selection: { anchor: Math.max(0, head - 1 + item.prefix.length) },
+            userEvent: 'input.type'
+        });
+    }
     hidePalette();
     view.focus();
 }
@@ -105,82 +133,40 @@ function initEditor() {
     editor = new EditorView({
         doc: fullText,
         extensions: [
-            keymap.of([
-                {
-                    key: "ArrowDown", run: (view) => {
-                        if (paletteActive) {
-                            paletteIndex = (paletteIndex + 1) % paletteItems.length;
-                            updatePaletteUI();
-                            return true;
-                        }
-                        return false;
-                    }
-                },
-                {
-                    key: "ArrowUp", run: (view) => {
-                        if (paletteActive) {
-                            paletteIndex = (paletteIndex - 1 + paletteItems.length) % paletteItems.length;
-                            updatePaletteUI();
-                            return true;
-                        }
-                        return false;
-                    }
-                },
-                {
-                    key: "Enter", run: (view) => {
-                        if (paletteActive) {
-                            applyPaletteSelection(view);
-                            return true;
-                        }
-                        return false;
-                    }
-                },
-                {
-                    key: "Escape", run: (view) => {
-                        if (paletteActive) {
-                            hidePalette();
-                            return true;
-                        }
-                        return false;
-                    }
-                },
-                {
-                    key: " ", run: (view) => {
-                        if (paletteActive) {
-                            hidePalette();
-                            return false; // let the space be typed
-                        }
-                        return false;
-                    }
-                }
-            ]),
             basicSetup,
             markdown(),
             EditorView.lineWrapping,
             EditorView.updateListener.of((update) => {
+                if (update.docChanged && !isRemoteUpdate) {
+                    scheduleSave();
+                }
+
+                if (isRemoteUpdate) return;
+
                 const isFiltering = !document.getElementById('side-panel').classList.contains('closed')
                     && document.getElementById('search-input').value !== '';
-                if (update.docChanged && !isRemoteUpdate && !isFiltering) {
-                    scheduleSave();
 
-                    // Command Palette Logic
-                    const head = update.state.selection.main.head;
-                    const line = update.state.doc.lineAt(head);
-                    const textBefore = line.text.substring(0, head - line.from);
+                if (isFiltering) return;
 
-                    if (textBefore.endsWith('/')) {
-                        const coords = editor.coordsAtPos(head);
-                        if (coords) {
+                // Command Palette Logic
+                const head = update.state.selection.main.head;
+                const line = update.state.doc.lineAt(head);
+                const textBefore = line.text.substring(0, head - line.from);
+
+                if (textBefore.endsWith('/')) {
+                    const coords = editor.coordsAtPos(head);
+                    if (coords) {
+                        if (!paletteActive) {
                             paletteActive = true;
                             paletteIndex = 0;
                             updatePaletteUI();
-                            paletteEl.style.display = 'block';
-                            paletteEl.style.left = coords.left + 'px';
-                            paletteEl.style.top = coords.bottom + 'px';
                         }
-                    } else if (paletteActive) {
-                        hidePalette();
+                        paletteEl.style.display = 'block';
+                        paletteEl.style.left = coords.left + 'px';
+                        paletteEl.style.top = coords.bottom + 'px';
                     }
+                } else if (paletteActive) {
+                    hidePalette();
                 }
             }),
             EditorView.domEventHandlers({
@@ -228,6 +214,31 @@ function initEditor() {
     });
 
     window.editor = editor;
+    
+    // Reliable keyboard interception for Command Palette
+    editor.contentDOM.addEventListener('keydown', (e) => {
+        if (!paletteActive) return;
+        
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            paletteIndex = (paletteIndex + 1) % paletteItems.length;
+            updatePaletteUI();
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            paletteIndex = (paletteIndex - 1 + paletteItems.length) % paletteItems.length;
+            updatePaletteUI();
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            applyPaletteSelection(editor);
+        } else if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            hidePalette();
+        }
+    }, true);
 
     // Auto-scroll to bottom
     setTimeout(() => {

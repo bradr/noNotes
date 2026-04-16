@@ -256,7 +256,6 @@
         let activityData = { created: {}, modified: {} };
 
         async function fetchActivity() {
-            renderCalendar(); // Initial render
             try {
                 const response = await fetch('/activity');
                 if (!response.ok) throw new Error('Fetch failed');
@@ -268,9 +267,16 @@
             }
         }
 
+        let lastActivityHash = "";
         function renderCalendar() {
             const grid = document.getElementById('calendar-grid');
             const monthYearLabel = document.getElementById('cal-month-year');
+            
+            // Prevent flicker by checking if data actually changed
+            const currentHash = JSON.stringify(activityData) + currentCalDate.getMonth() + currentCalDate.getFullYear();
+            if (currentHash === lastActivityHash) return;
+            lastActivityHash = currentHash;
+
             grid.innerHTML = '';
 
             const year = currentCalDate.getFullYear();

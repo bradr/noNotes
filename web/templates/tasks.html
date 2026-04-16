@@ -4,6 +4,7 @@
            hx-post="/tasks/toggle" 
            hx-swap="none"
            hx-vals='{"line": {{.LineNum}}}'
+           onchange="const item = this.closest('.task-item'); item.style.pointerEvents='none'; item.style.opacity='0.4'; item.style.transform='translateX(20px)'; setTimeout(() => item.remove(), 400); if (window.toggleTaskInEditor) window.toggleTaskInEditor({{.LineNum}});"
            {{if .Done}}checked{{end}}>
     <div class="task-content">
         <span class="task-text">{{.Text}}</span>

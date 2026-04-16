@@ -107,13 +107,44 @@ function applyPaletteSelection(view) {
 
 // ─── Timeline load ────────────────────────────────────────────────────────────
 
+async function loadTasks() {
+    try {
+        const res = await fetch('/tasks');
+        const html = await res.text();
+        const container = document.getElementById('task-list');
+        if (container) {
+            // Soft check: Compare task text and count to avoid flicker from timestamp updates
+            const oldTasks = Array.from(container.querySelectorAll('.task-item')).map(t => t.querySelector('.task-text').textContent + t.classList.contains('done'));
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            const newTasks = Array.from(temp.querySelectorAll('.task-item')).map(t => t.querySelector('.task-text').textContent + t.classList.contains('done'));
+
+            if (JSON.stringify(oldTasks) === JSON.stringify(newTasks)) return;
+            
+            const oldScroll = container.scrollTop;
+            container.innerHTML = html;
+            
+            if (newTasks.length > oldTasks.length) {
+                // Scroll to new items
+                const lastItem = container.querySelector('.task-item:last-child');
+                if (lastItem) lastItem.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            } else {
+                container.scrollTop = oldScroll;
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load tasks:', err);
+    }
+}
+
 async function loadTimeline(initialLoad = false) {
     try {
         const res = await fetch('/timeline', { cache: 'no-store' });
         const data = await res.json();
         timelineData = Array.isArray(data) ? data : [];
         window.timelineData = timelineData;
-        fullText = timelineData.map(r => r.text || "").join('\n');
+        // Normalize text by removing carriage returns to prevent CRLF vs LF flickering
+        fullText = timelineData.map(r => (r.text || "").replace(/\r/g, "")).join('\n');
     } catch (err) {
         console.error("Failed to load timeline:", err);
     }
@@ -325,13 +356,42 @@ function updateEditorFromRemote() {
             return;
         }
 
+        // --- Soft Update: Find the changed range to prevent visual flicker ---
+        let from = 0, to = localText.length;
+        let insert = fullText;
+
+        // Find shared prefix
+        let prefixLen = 0;
+        const minLen = Math.min(localText.length, fullText.length);
+        while (prefixLen < minLen && localText[prefixLen] === fullText[prefixLen]) {
+            prefixLen++;
+        }
+
+        if (prefixLen > 0) {
+            from = prefixLen;
+            const remainingLocal = localText.substring(prefixLen);
+            const remainingRemote = fullText.substring(prefixLen);
+            
+            // Find shared suffix
+            let suffixLen = 0;
+            const minRem = Math.min(remainingLocal.length, remainingRemote.length);
+            while (suffixLen < minRem && remainingLocal[remainingLocal.length - 1 - suffixLen] === remainingRemote[remainingRemote.length - 1 - suffixLen]) {
+                suffixLen++;
+            }
+            
+            to = localText.length - suffixLen;
+            insert = fullText.substring(prefixLen, fullText.length - suffixLen);
+        }
+
         const anchor = editor.state.selection.main.anchor;
         const scrollTop = editor.scrollDOM.scrollTop;
         isRemoteUpdate = true;
+        
         editor.dispatch({
-            changes: { from: 0, to: editor.state.doc.length, insert: fullText },
+            changes: { from, to, insert },
             selection: { anchor: Math.min(anchor, fullText.length) }
         });
+        
         isRemoteUpdate = false;
 
         requestAnimationFrame(() => {
@@ -481,8 +541,7 @@ try {
     const evtSource = new EventSource('/events');
     evtSource.addEventListener('update', () => {
         loadTimeline(false);
-        const taskList = document.getElementById('task-list');
-        if (taskList && window.htmx) htmx.trigger(taskList, 'update-tasks');
+        loadTasks();
     });
 } catch (e) { }
 
@@ -506,6 +565,26 @@ window.scrollToLine = (lineNum) => {
         editor.contentDOM.focus();
     } catch (e) {
         console.error("Scroll to line failed", e);
+    }
+};
+
+window.toggleTaskInEditor = (lineNum) => {
+    if (!editor) return;
+    try {
+        const line = editor.state.doc.line(lineNum);
+        const match = /\[([ x])\]/.exec(line.text);
+        if (match) {
+            const isToChecked = match[1] === ' ';
+            const bracketIndex = line.text.indexOf('[');
+            const pos = line.from + bracketIndex + 1;
+            
+            isRemoteUpdate = false; // Ensure this behaves like a local edit
+            editor.dispatch({
+                changes: { from: pos, to: pos + 1, insert: isToChecked ? "x" : " " }
+            });
+        }
+    } catch (e) {
+        console.error("Failed to toggle task in editor", e);
     }
 };
 

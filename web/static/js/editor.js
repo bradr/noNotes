@@ -215,8 +215,55 @@ function initEditor() {
 
     window.editor = editor;
     
-    // Reliable keyboard interception for Command Palette
+    // Reliable keyboard interception for Command Palette and Tab indentation
     editor.contentDOM.addEventListener('keydown', (e) => {
+        // Handle Tab indentation (always active)
+        if (e.key === "Tab") {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            
+            const isShift = e.shiftKey;
+            const view = editor;
+            const { state } = view;
+            const changes = [];
+            const lines = new Set();
+            
+            for (const range of state.selection.ranges) {
+                const startLine = state.doc.lineAt(range.from).number;
+                const endLine = state.doc.lineAt(range.to).number;
+                for (let i = startLine; i <= endLine; i++) lines.add(i);
+            }
+            
+            for (const lineNum of lines) {
+                const line = state.doc.line(lineNum);
+                if (isShift) {
+                    // Outdent: remove up to 4 spaces or 1 tab from the start
+                    let toRemove = 0;
+                    if (line.text.startsWith("    ")) toRemove = 4;
+                    else if (line.text.startsWith("\t")) toRemove = 1;
+                    else {
+                        const match = line.text.match(/^ +/);
+                        if (match) toRemove = Math.min(match[0].length, 4);
+                    }
+                    if (toRemove > 0) {
+                        changes.push({ from: line.from, to: line.from + toRemove });
+                    }
+                } else {
+                    // Indent: add 4 spaces at the start of the line
+                    changes.push({ from: line.from, insert: "    " });
+                }
+            }
+            
+            if (changes.length > 0) {
+                view.dispatch({ 
+                    changes, 
+                    userEvent: isShift ? "input.outdent" : "input.indent",
+                    scrollIntoView: true 
+                });
+            }
+            return;
+        }
+
         if (!paletteActive) return;
         
         if (e.key === "ArrowDown") {
@@ -267,7 +314,17 @@ function updateEditorFromRemote() {
         && document.getElementById('search-input').value !== '';
     if (isFiltering) return;
 
-    if (Date.now() - lastSaveLocal > 3000) {
+    // Only update if we haven't typed for 5 seconds to avoid race conditions
+    if (Date.now() - lastSaveLocal > 5000) {
+        const localText = editor.state.doc.toString();
+        if (localText === fullText) return;
+
+        // If the only difference is trailing newlines at the end of the file, 
+        // trust the local version to avoid "flickering" out new lines.
+        if (localText.startsWith(fullText) && localText.substring(fullText.length).match(/^\n+$/)) {
+            return;
+        }
+
         const anchor = editor.state.selection.main.anchor;
         const scrollTop = editor.scrollDOM.scrollTop;
         isRemoteUpdate = true;

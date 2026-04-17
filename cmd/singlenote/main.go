@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/bradr/noNotes/internal/api"
@@ -14,17 +17,14 @@ import (
 )
 
 func main() {
-	// Let's ensure the repo paths exist
 	repoPath := "notes"
 	fileName := "notes.md"
 	dbPath := "singlenote.db"
 
-	// 1. Configure safe directory for Docker/Volume scenarios
 	if err := git.ConfigureSafeDirectory(repoPath); err != nil {
 		log.Printf("Warning: failed to configure git safe directory: %v", err)
 	}
 
-	// 2. Create notes dir if it doesn't exist
 	if _, err := os.Stat(filepath.Join(repoPath, ".git")); os.IsNotExist(err) {
 		log.Println("Initializing new git repository in", repoPath)
 		if err := os.MkdirAll(repoPath, 0755); err != nil {
@@ -35,8 +35,6 @@ func main() {
 		}
 	}
 
-
-	// Create notes.md if it doesn't exist
 	fullFilePath := filepath.Join(repoPath, fileName)
 	if _, err := os.Stat(fullFilePath); os.IsNotExist(err) {
 		if err := os.WriteFile(fullFilePath, []byte("# SingleNote Init\n"), 0644); err != nil {
@@ -48,6 +46,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize indexer: %v", err)
 	}
+	defer idx.Close()
 
 	w := watcher.New(repoPath, fileName, idx, 2*time.Second)
 	if err := w.Start(); err != nil {
@@ -59,10 +58,26 @@ func main() {
 		log.Fatalf("Failed to initialize API server: %v", err)
 	}
 
-	handler := server.SetupRoutes()
+	httpServer := &http.Server{
+		Addr:    ":8080",
+		Handler: server.SetupRoutes(),
+	}
 
-	log.Println("Starting noNotes server on http://localhost:8080")
-	if err := http.ListenAndServe(":8080", handler); err != nil {
-		log.Fatal(err)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Println("Starting noNotes server on http://localhost:8080")
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	<-quit
+	log.Println("Shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := httpServer.Shutdown(ctx); err != nil {
+		log.Printf("Shutdown error: %v", err)
 	}
 }

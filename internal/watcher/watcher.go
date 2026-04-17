@@ -1,9 +1,11 @@
 package watcher
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -122,6 +124,32 @@ func (w *Watcher) commitAndIndex() {
 	w.Broadcast()
 
 	log.Println("Successfully indexed file changes.")
+}
+
+// ToggleLine flips [ ] ↔ [x] on a specific line, holding the mutex for the
+// entire read-modify-write so concurrent requests can't clobber each other.
+func (w *Watcher) ToggleLine(filePath string, lineNum int) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	b, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(b), "\n")
+	if lineNum < 1 || lineNum > len(lines) {
+		return fmt.Errorf("line %d out of bounds", lineNum)
+	}
+	line := lines[lineNum-1]
+	switch {
+	case strings.Contains(line, "[ ]"):
+		lines[lineNum-1] = strings.Replace(line, "[ ]", "[x]", 1)
+	case strings.Contains(line, "[x]"):
+		lines[lineNum-1] = strings.Replace(line, "[x]", "[ ]", 1)
+	default:
+		return fmt.Errorf("no checkbox on line %d", lineNum)
+	}
+	return os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
 }
 
 // WriteFile writes content to the notes file under the watcher mutex,

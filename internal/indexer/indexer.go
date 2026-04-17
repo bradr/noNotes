@@ -36,6 +36,10 @@ func New(dbPath string) (*Indexer, error) {
 	return idx, nil
 }
 
+func (idx *Indexer) Close() error {
+	return idx.db.Close()
+}
+
 func (idx *Indexer) initSchema() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS timeline (

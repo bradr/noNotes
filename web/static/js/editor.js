@@ -295,29 +295,6 @@ function initEditor() {
     });
     window.editor = editor;
 
-    window.addEventListener('keydown', (e) => {
-        if (!paletteActive) return;
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            paletteIndex = (paletteIndex + 1) % paletteItems.length;
-            updatePaletteUI();
-        } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            paletteIndex = (paletteIndex - 1 + paletteItems.length) % paletteItems.length;
-            updatePaletteUI();
-        } else if (e.key === "Enter") {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            applyPaletteSelection(editor);
-        } else if (e.key === "Escape") {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            hidePalette();
-        }
-    }, true);
-
     setTimeout(() => {
         editor.dispatch({
             selection: { anchor: editor.state.doc.length },
@@ -492,6 +469,30 @@ try {
 
 setupSearchOverlay();
 setupCommandPalette();
+
+window.addEventListener('keydown', (e) => {
+    if (!paletteActive) return;
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        paletteIndex = (paletteIndex + 1) % paletteItems.length;
+        updatePaletteUI();
+    } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        paletteIndex = (paletteIndex - 1 + paletteItems.length) % paletteItems.length;
+        updatePaletteUI();
+    } else if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        applyPaletteSelection(editor);
+    } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        hidePalette();
+    }
+}, true);
+
 setupHistoryModal();
 loadTimeline(true);
 

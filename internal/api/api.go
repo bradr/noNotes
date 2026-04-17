@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -251,31 +250,7 @@ func (s *Server) handleToggleTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, err := os.ReadFile(s.filePath)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	lines := strings.Split(string(b), "\n")
-	if targetLine < 1 || targetLine > len(lines) {
-		http.Error(w, "Line number out of bounds", http.StatusNotFound)
-		return
-	}
-
-	lineIdx := targetLine - 1
-	line := lines[lineIdx]
-
-	if strings.Contains(line, "[ ]") {
-		lines[lineIdx] = strings.Replace(line, "[ ]", "[x]", 1)
-	} else if strings.Contains(line, "[x]") {
-		lines[lineIdx] = strings.Replace(line, "[x]", "[ ]", 1)
-	} else {
-		http.Error(w, "No checkbox found on target line", http.StatusNotFound)
-		return
-	}
-
-	if err := s.watcher.WriteFile(s.filePath, []byte(strings.Join(lines, "\n"))); err != nil {
+	if err := s.watcher.ToggleLine(s.filePath, targetLine); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -297,10 +272,20 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	notifyCh := s.watcher.RegisterClient()
 	defer s.watcher.UnregisterClient(notifyCh)
 
+	heartbeat := time.NewTicker(30 * time.Second)
+	defer heartbeat.Stop()
+
 	for {
 		select {
 		case <-notifyCh:
-			fmt.Fprintf(w, "event: update\ndata: {}\n\n")
+			if _, err := fmt.Fprintf(w, "event: update\ndata: {}\n\n"); err != nil {
+				return
+			}
+			flusher.Flush()
+		case <-heartbeat.C:
+			if _, err := fmt.Fprintf(w, ": ping\n\n"); err != nil {
+				return
+			}
 			flusher.Flush()
 		case <-r.Context().Done():
 			return

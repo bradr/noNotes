@@ -1,4 +1,4 @@
-{{ range . }}
+{{ range .Tasks }}
 <div class="task-item {{if .Done}}done{{end}}" {{ if .Context }}data-context="{{.Context}}"{{ end }}>
     <input type="checkbox" 
            hx-post="/tasks/toggle" 
@@ -7,7 +7,7 @@
            onchange="const item = this.closest('.task-item'); item.style.pointerEvents='none'; item.style.opacity='0.4'; item.style.transform='translateX(20px)'; setTimeout(() => item.remove(), 400); if (window.toggleTaskInEditor) window.toggleTaskInEditor({{.LineNum}});"
            {{if .Done}}checked{{end}}>
     <div class="task-content">
-        <span class="task-text">{{.Text}}</span>
+        <span class="task-text">{{ highlight .Text $.Query }}</span>
         <span class="task-date">{{ formatDate .Timestamp }}</span>
     </div>
     <button class="btn-jump" onclick="window.scrollToLine({{.LineNum}})" title="Jump to line">
@@ -19,5 +19,5 @@
     </button>
 </div>
 {{ else }}
-<div class="empty-state">No open tasks! Inbox zero.</div>
+<div class="empty-state">No tasks matching search.</div>
 {{ end }}

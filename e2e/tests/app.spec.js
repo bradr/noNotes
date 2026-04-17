@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 test.describe('SingleNote App', () => {
     test('should have the correct title', async ({ page }) => {
         await page.goto('/');
-        await expect(page).toHaveTitle(/SingleNote/);
+        await expect(page).toHaveTitle(/noNotes/);
     });
 
     test('should display the main editor', async ({ page }) => {

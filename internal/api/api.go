@@ -40,6 +40,31 @@ func (s *Server) render(w http.ResponseWriter, name string, data interface{}) {
 			}
 			return time.Unix(ts, 0).Format("Jan 02")
 		},
+		"highlight": func(text, query string) template.HTML {
+			if query == "" {
+				return template.HTML(template.HTMLEscapeString(text))
+			}
+			// Case-insensitive replacement
+			lowerText := strings.ToLower(text)
+			lowerQuery := strings.ToLower(query)
+			
+			var result strings.Builder
+			lastIdx := 0
+			for {
+				idx := strings.Index(lowerText[lastIdx:], lowerQuery)
+				if idx == -1 {
+					result.WriteString(template.HTMLEscapeString(text[lastIdx:]))
+					break
+				}
+				idx += lastIdx
+				result.WriteString(template.HTMLEscapeString(text[lastIdx:idx]))
+				result.WriteString("<mark class='search-highlight'>")
+				result.WriteString(template.HTMLEscapeString(text[idx : idx+len(query)]))
+				result.WriteString("</mark>")
+				lastIdx = idx + len(query)
+			}
+			return template.HTML(result.String())
+		},
 	})
 	tmpl, err := tmpl.ParseGlob("web/templates/*.html")
 	if err != nil {
@@ -62,7 +87,6 @@ func (s *Server) SetupRoutes() http.Handler {
 	mux.HandleFunc("/tasks/toggle", s.handleToggleTask)
 	mux.HandleFunc("/events", s.handleSSE)
 	mux.HandleFunc("/timeline", s.handleTimeline)
-	mux.HandleFunc("/activity", s.handleActivity)
 	mux.HandleFunc("/line/get", s.handleGetLine)
 	mux.HandleFunc("/line/update-date", s.handleUpdateLineDate)
 	mux.HandleFunc("/history", s.handleHistory)
@@ -128,16 +152,6 @@ func (s *Server) handleTimeline(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(rows)
 }
 
-func (s *Server) handleActivity(w http.ResponseWriter, r *http.Request) {
-	dates, err := s.indexer.GetActivityDates()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(dates)
-}
-
 func (s *Server) handleAppend(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -186,12 +200,26 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetTasks(w http.ResponseWriter, r *http.Request) {
+	query := strings.ToLower(r.URL.Query().Get("q"))
 	tasks, err := s.indexer.GetTasks()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.render(w, "tasks.html", tasks)
+
+	if query != "" {
+		filtered := make([]indexer.Task, 0)
+		for _, t := range tasks {
+			if strings.Contains(strings.ToLower(t.Text), query) {
+				filtered = append(filtered, t)
+			}
+		}
+		tasks = filtered
+	}
+	s.render(w, "tasks.html", map[string]interface{}{
+		"Tasks": tasks,
+		"Query": query,
+	})
 }
 
 func (s *Server) handleToggleTask(w http.ResponseWriter, r *http.Request) {

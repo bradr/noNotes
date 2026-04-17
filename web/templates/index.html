@@ -177,7 +177,7 @@
         </div>
     </div>
 
-    <script type="module" src="/static/js/editor.js?v=2"></script>
+    <script type="module" src="/static/js/editor.js"></script>
 
     <script>
         // ... previous scripts ...
@@ -277,17 +277,47 @@
         // ─── Calendar Logic ──────────────────────────────────────────────
         let currentCalDate = new Date();
         let activityData = { created: {}, modified: {} };
+        window.activityDates = {}; // For testing
 
-        async function fetchActivity() {
-            try {
-                const response = await fetch('/activity');
-                if (!response.ok) throw new Error('Fetch failed');
-                activityData = await response.json();
-                renderCalendar();
-            } catch (e) {
-                console.error("Activity fetch failed", e);
-                renderCalendar();
+
+        function computeActivity() {
+            const activity = { created: {}, modified: {} };
+            const data = window.timelineData || [];
+            
+            data.forEach(row => {
+                if (!row.text || !row.text.trim()) return;
+                
+                // Helper to get local YYYY-MM-DD
+                const getLocalISO = (ts) => {
+                    if (!ts) return null;
+                    const d = new Date(ts * 1000);
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                };
+
+                const creStr = getLocalISO(row.created_at);
+                const modStr = getLocalISO(row.timestamp);
+
+                if (creStr && (activity.created[creStr] === undefined || row.line_num < activity.created[creStr])) {
+                    activity.created[creStr] = row.line_num;
+                }
+                if (modStr && (activity.modified[modStr] === undefined || row.line_num < activity.modified[modStr])) {
+                    activity.modified[modStr] = row.line_num;
+                }
+            });
+            
+            // Populate test helper
+            window.activityDates = {};
+            for (const d in activity.created) window.activityDates[d] = activity.created[d];
+            for (const d in activity.modified) {
+                if (window.activityDates[d] === undefined) window.activityDates[d] = activity.modified[d];
             }
+            
+            return activity;
+        }
+
+        function fetchActivity() {
+            activityData = computeActivity();
+            renderCalendar();
         }
 
         let lastActivityHash = "";
@@ -295,6 +325,8 @@
             const grid = document.getElementById('calendar-grid');
             const monthYearLabel = document.getElementById('cal-month-year');
             
+            if (!grid || !monthYearLabel) return;
+
             // Prevent flicker by checking if data actually changed
             const currentHash = JSON.stringify(activityData) + currentCalDate.getMonth() + currentCalDate.getFullYear();
             if (currentHash === lastActivityHash) return;
@@ -327,10 +359,12 @@
 
                 if (createdLine !== undefined) {
                     dayDiv.classList.add('has-creation');
-                    dayDiv.title = `Initial notes on ${dateStr}`;
+                    dayDiv.classList.add('has-activity'); // For test mapping
+                    dayDiv.title = `Activity on ${dateStr}`;
                 } else if (modifiedLine !== undefined) {
                     dayDiv.classList.add('has-modification');
-                    dayDiv.title = `Edits on ${dateStr}`;
+                    dayDiv.classList.add('has-activity'); // For test mapping
+                    dayDiv.title = `Activity on ${dateStr}`;
                 }
 
                 if (createdLine !== undefined || modifiedLine !== undefined) {

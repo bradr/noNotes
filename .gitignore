@@ -14,3 +14,4 @@ e2e/scripts/repro_*_
 e2e/node_modules
 singlenote.db
 PRD.md
+.claude

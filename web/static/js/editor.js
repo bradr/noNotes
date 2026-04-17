@@ -601,6 +601,7 @@ function setupHistoryModal() {
             const item = document.createElement('div');
             item.className = 'history-item';
 
+            const escHtml = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
             const previewLines = (entry.preview || []).map(l => {
                 const isAdd = l.startsWith('+');
                 const color = isAdd ? 'var(--accent, #4caf50)' : '#f44336';
@@ -619,7 +620,7 @@ function setupHistoryModal() {
                         <button class="btn-revert" data-hash="${entry.hash}">Revert</button>
                     </span>
                 </div>
-                ${entry.subject ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${entry.subject}</div>` : ''}
+                ${entry.subject ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escHtml(entry.subject)}</div>` : ''}
                 ${previewLines ? `<div class="history-preview-list">${previewLines}</div>` : ''}`;
 
             item.querySelector('.btn-revert').onclick = async (e) => {

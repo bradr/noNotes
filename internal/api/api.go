@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,8 @@ import (
 	"github.com/bradr/noNotes/internal/indexer"
 	"github.com/bradr/noNotes/internal/watcher"
 )
+
+var validHash = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 
 type Server struct {
 	repoPath string
@@ -101,8 +104,12 @@ func (s *Server) SetupRoutes() http.Handler {
 
 func (s *Server) handleGetLine(w http.ResponseWriter, r *http.Request) {
 	lineStr := r.URL.Query().Get("line")
-	lineNum, _ := strconv.Atoi(lineStr)
-	
+	lineNum, err := strconv.Atoi(lineStr)
+	if err != nil || lineNum < 1 {
+		http.Error(w, "Invalid line number", http.StatusBadRequest)
+		return
+	}
+
 	row, err := s.indexer.GetLine(lineNum)
 	if err != nil {
 		http.Error(w, "Line not found", http.StatusNotFound)
@@ -119,11 +126,23 @@ func (s *Server) handleUpdateLineDate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	lineNum, _ := strconv.Atoi(r.FormValue("line"))
-	createdAt, _ := strconv.ParseInt(r.FormValue("created_at"), 10, 64)
-	modifiedAt, _ := strconv.ParseInt(r.FormValue("modified_at"), 10, 64)
-	
-	err := s.indexer.UpdateLineDate(lineNum, createdAt, modifiedAt)
+	lineNum, err := strconv.Atoi(r.FormValue("line"))
+	if err != nil || lineNum < 1 {
+		http.Error(w, "Invalid line number", http.StatusBadRequest)
+		return
+	}
+	createdAt, err := strconv.ParseInt(r.FormValue("created_at"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid created_at", http.StatusBadRequest)
+		return
+	}
+	modifiedAt, err := strconv.ParseInt(r.FormValue("modified_at"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid modified_at", http.StatusBadRequest)
+		return
+	}
+
+	err = s.indexer.UpdateLineDate(lineNum, createdAt, modifiedAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -164,14 +183,7 @@ func (s *Server) handleAppend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	f, err := os.OpenFile(s.filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer f.Close()
-
-	if _, err := f.WriteString(fmt.Sprintf("\n%s\n", text)); err != nil {
+	if err := s.watcher.AppendFile(s.filePath, fmt.Sprintf("\n%s\n", text)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -190,8 +202,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		// Just clear the file if it's empty, or ignore
 	}
 
-	err := os.WriteFile(s.filePath, []byte(text), 0644)
-	if err != nil {
+	if err := s.watcher.WriteFile(s.filePath, []byte(text)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -264,9 +275,7 @@ func (s *Server) handleToggleTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Write back
-	err = os.WriteFile(s.filePath, []byte(strings.Join(lines, "\n")), 0644)
-	if err != nil {
+	if err := s.watcher.WriteFile(s.filePath, []byte(strings.Join(lines, "\n"))); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -311,8 +320,8 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 	hash := r.URL.Query().Get("hash")
-	if hash == "" {
-		http.Error(w, "Hash required", http.StatusBadRequest)
+	if !validHash.MatchString(hash) {
+		http.Error(w, "Invalid hash", http.StatusBadRequest)
 		return
 	}
 	diff, err := git.Diff(s.repoPath, filepath.Base(s.filePath), hash)
@@ -330,8 +339,8 @@ func (s *Server) handleRevert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hash := r.FormValue("hash")
-	if hash == "" {
-		http.Error(w, "Hash required", http.StatusBadRequest)
+	if !validHash.MatchString(hash) {
+		http.Error(w, "Invalid hash", http.StatusBadRequest)
 		return
 	}
 	err := git.Undo(s.repoPath, hash)

@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"log"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -121,6 +122,27 @@ func (w *Watcher) commitAndIndex() {
 	w.Broadcast()
 
 	log.Println("Successfully indexed file changes.")
+}
+
+// WriteFile writes content to the notes file under the watcher mutex,
+// serializing with commitAndIndex so git blame never sees a partial write.
+func (w *Watcher) WriteFile(filePath string, content []byte) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return os.WriteFile(filePath, content, 0644)
+}
+
+// AppendFile appends text to the notes file under the watcher mutex.
+func (w *Watcher) AppendFile(filePath string, text string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(text)
+	return err
 }
 
 func (w *Watcher) RegisterClient() chan struct{} {

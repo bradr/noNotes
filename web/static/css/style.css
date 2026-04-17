@@ -36,9 +36,22 @@
     --selection: rgba(88, 108, 138, 0.2);
     --selection-focused: rgba(88, 108, 138, 0.3);
     --active-line: rgba(88, 108, 138, 0.05);
+
+    /* Markdown syntax visibility */
+    --md-symbol: #b8b8bc;
 }
 
-/* Automatic dark mode if no manual theme is set */
+/* Improved visibility for markdown symbols and syntax in dark mode */
+[data-theme="dark"] .cm-editor .cm-content span {
+    color: #b0b0bc !important;
+}
+
+/* Ensure automatic dark mode also gets the fix */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .cm-editor .cm-content span {
+        color: #b0b0bc !important;
+    }
+}
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         --bg: #121214;
@@ -52,6 +65,7 @@
         --selection: rgba(88, 108, 138, 0.2);
         --selection-focused: rgba(88, 108, 138, 0.3);
         --active-line: rgba(88, 108, 138, 0.05);
+        --md-symbol: #b8b8bc;
     }
 }
 
@@ -886,6 +900,166 @@ html {
 
 .palette-label {
     flex: 1;
+}
+
+@keyframes paletteFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* ── History Modal ─────────────────────────────────────────────────────────── */
+
+.history-modal-content {
+    width: 600px !important;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-shrink: 0;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 20px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.btn-icon:hover {
+    background: var(--border);
+    color: var(--text);
+}
+
+.history-body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-right: 4px;
+}
+
+.history-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.history-body::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.history-item {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 8px;
+    margin-bottom: 6px;
+}
+
+.history-item:hover {
+    background: var(--surface);
+    transform: translateX(4px);
+}
+
+.history-item-header {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.history-time {
+    color: var(--text-muted);
+}
+
+.history-stats {
+    font-weight: 500;
+}
+
+.stat-add {
+    color: #4caf50;
+    margin-right: 8px;
+}
+
+.stat-del {
+    color: #f44336;
+}
+
+.history-preview-list {
+    margin-top: 8px;
+    background: rgba(0, 0, 0, 0.02);
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+[data-theme="dark"] .history-preview-list {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.history-item-diff {
+    animation: accordionIn 0.3s var(--ease-out);
+}
+
+@keyframes accordionIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.diff-content-inner {
+    background: rgba(0, 0, 0, 0.03);
+    padding: 14px;
+    border-radius: 8px;
+    font-family: var(--font-prose);
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    margin: 0;
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .diff-content-inner {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Diff coloring */
+.diff-added {
+    color: #81c784;
+}
+
+.diff-removed {
+    color: #e57373;
+}
+
+.diff-meta {
+    color: var(--text-muted);
+    opacity: 0.7;
 }
 
 @keyframes paletteFadeIn {

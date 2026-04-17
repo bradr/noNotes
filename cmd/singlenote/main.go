@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/bradr/singlenote/internal/api"
-	"github.com/bradr/singlenote/internal/git"
-	"github.com/bradr/singlenote/internal/indexer"
-	"github.com/bradr/singlenote/internal/watcher"
+	"github.com/bradr/noNotes/internal/api"
+	"github.com/bradr/noNotes/internal/git"
+	"github.com/bradr/noNotes/internal/indexer"
+	"github.com/bradr/noNotes/internal/watcher"
 )
 
 func main() {

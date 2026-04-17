@@ -549,6 +549,7 @@ try {
 
 setupSearchOverlay();
 setupCommandPalette();
+setupHistoryModal();
 loadTimeline(true);
 
 window.scrollToLine = (lineNum) => {
@@ -616,3 +617,161 @@ window.addNewNote = () => {
 
     editor.contentDOM.focus();
 };
+
+// ─── History Modal ──────────────────────────────────────────────────────────
+
+function setupHistoryModal() {
+    const btnHistory = document.getElementById('btn-history');
+    const modal = document.getElementById('history-modal');
+    const closeBtn = document.getElementById('history-close');
+    const list = document.getElementById('history-list');
+
+    if (!btnHistory || !modal) return;
+
+    btnHistory.onclick = async () => {
+        modal.style.display = 'flex';
+        await loadHistory();
+    };
+
+    closeBtn.onclick = () => {
+        modal.style.display = 'none';
+    };
+
+    window.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'h') {
+            e.preventDefault();
+            btnHistory.click();
+        }
+        if (e.key === 'Escape' && modal.style.display === 'flex') {
+            modal.style.display = 'none';
+        }
+    });
+
+    async function loadHistory() {
+        list.innerHTML = '<div class="empty-state">Loading history...</div>';
+        try {
+            const res = await fetch('/history');
+            const data = await res.json();
+            if (!data || data.length === 0) {
+                list.innerHTML = '<div class="empty-state">No history found</div>';
+                return;
+            }
+
+            list.innerHTML = '';
+            data.forEach(entry => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                const date = new Date(entry.timestamp * 1000).toLocaleString('en-US', {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+                
+                // Format preview lines
+                const previewLines = (entry.preview || []).map(line => {
+                    const cls = line.startsWith('+') ? 'diff-added' : 'diff-removed';
+                    return `<div class="${cls}" style="font-family: var(--font-prose); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.8; margin-top: 2px;">${line}</div>`;
+                }).join('');
+
+                item.innerHTML = `
+                    <div class="history-item-header">
+                        <span class="history-time">${date}</span>
+                        <div class="history-stats">
+                            <span class="stat-add">+${entry.additions}</span>
+                            <span class="stat-del">-${entry.deletions}</span>
+                        </div>
+                    </div>
+                    <div class="history-preview-list">${previewLines}</div>
+                    <div class="history-item-diff" style="display: none; margin-top: 12px;">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                            <button class="btn-primary revert-btn" data-hash="${entry.hash}" style="font-size: 11px; padding: 4px 10px; border-radius: 4px;">Undo this change</button>
+                        </div>
+                        <pre class="diff-content-inner"></pre>
+                    </div>
+                `;
+                item.onclick = (e) => {
+                    if (e.target.classList.contains('revert-btn')) {
+                        e.stopPropagation();
+                        revertChange(entry.hash);
+                    } else {
+                        toggleDiff(entry, item);
+                    }
+                };
+                list.appendChild(item);
+            });
+        } catch (e) {
+            console.error("Failed to load history", e);
+            list.innerHTML = '<div class="empty-state">Error loading history</div>';
+        }
+    }
+
+    async function revertChange(hash) {
+        try {
+            const formData = new URLSearchParams();
+            formData.append('hash', hash);
+            const res = await fetch('/revert', {
+                method: 'POST',
+                body: formData
+            });
+            if (res.ok) {
+                modal.style.display = 'none';
+                // The watcher will detect the file change and trigger an update,
+                // but we can also manually trigger a reload to be faster.
+                loadTimeline(false);
+            } else {
+                const msg = await res.text();
+                alert(msg);
+            }
+        } catch (e) {
+            console.error("Revert failed", e);
+        }
+    }
+
+    async function toggleDiff(entry, itemElement) {
+        const diffContainer = itemElement.querySelector('.history-item-diff');
+        const previewList = itemElement.querySelector('.history-preview-list');
+        const contentInner = diffContainer.querySelector('.diff-content-inner');
+
+        if (diffContainer.style.display === 'block') {
+            diffContainer.style.display = 'none';
+            previewList.style.display = 'flex';
+            return;
+        }
+
+        // Close others for focus
+        list.querySelectorAll('.history-item-diff').forEach(el => el.style.display = 'none');
+        list.querySelectorAll('.history-preview-list').forEach(el => el.style.display = 'flex');
+
+        diffContainer.style.display = 'block';
+        previewList.style.display = 'none';
+
+        if (contentInner.getAttribute('data-loaded') === 'true') return;
+
+        contentInner.textContent = 'Loading diff...';
+
+        try {
+            const res = await fetch(`/diff?hash=${entry.hash}`);
+            const text = await res.text();
+            
+            const lines = text.split('\n');
+            contentInner.innerHTML = '';
+            let inHunk = false;
+            lines.forEach(line => {
+                if (line.startsWith('@@')) inHunk = true;
+                if (!inHunk) return;
+
+                const span = document.createElement('span');
+                if (line.startsWith('+') && !line.startsWith('+++')) {
+                    span.className = 'diff-added';
+                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                    span.className = 'diff-removed';
+                } else if (line.startsWith('@@') || line.startsWith('diff ') || line.startsWith('index ')) {
+                    span.className = 'diff-meta';
+                }
+                span.textContent = line + '\n';
+                contentInner.appendChild(span);
+            });
+            contentInner.setAttribute('data-loaded', 'true');
+        } catch (e) {
+            contentInner.textContent = 'Error loading diff';
+        }
+    }
+}

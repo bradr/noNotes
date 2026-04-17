@@ -7,7 +7,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/bradr/singlenote/internal/git"
+	"github.com/bradr/noNotes/internal/git"
 )
 
 type Indexer struct {

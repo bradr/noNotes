@@ -1,4 +1,4 @@
-module github.com/bradr/singlenote
+module github.com/bradr/noNotes
 
 go 1.24.3
 

@@ -110,3 +110,98 @@ func Blame(repoPath, file string) ([]BlameLine, error) {
 	
 	return results, nil
 }
+
+type LogEntry struct {
+	Hash      string   `json:"hash"`
+	Timestamp int64    `json:"timestamp"`
+	Subject   string   `json:"subject"`
+	Additions int      `json:"additions"`
+	Deletions int    `json:"deletions"`
+	Preview   []string `json:"preview"`
+}
+
+func History(repoPath, file string) ([]LogEntry, error) {
+	// Use -p to get the patch so we can extract previews
+	// We use a unique separator to reliably identify commit lines
+	const separator = "===COMMIT==="
+	cmd := exec.Command("git", "log", "--pretty=format:"+separator+"%H|%at|%s", "-p", file)
+	cmd.Dir = repoPath
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git log failed: %w", err)
+	}
+
+	var entries []LogEntry
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+	var currentEntry *LogEntry
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		if strings.HasPrefix(line, separator) {
+			line = strings.TrimPrefix(line, separator)
+			parts := strings.SplitN(line, "|", 3)
+			if len(parts) == 3 {
+				ts, _ := strconv.ParseInt(parts[1], 10, 64)
+				newEntry := LogEntry{
+					Hash:      parts[0],
+					Timestamp: ts,
+					Subject:   parts[2],
+					Preview:   []string{},
+				}
+				entries = append(entries, newEntry)
+				currentEntry = &entries[len(entries)-1]
+			}
+			continue
+		}
+
+		if currentEntry == nil {
+			continue
+		}
+
+		// Parse diff lines
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			currentEntry.Additions++
+			if len(currentEntry.Preview) < 4 {
+				currentEntry.Preview = append(currentEntry.Preview, line)
+			}
+		} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+			currentEntry.Deletions++
+			if len(currentEntry.Preview) < 4 {
+				currentEntry.Preview = append(currentEntry.Preview, line)
+			}
+		}
+	}
+
+	return entries, nil
+}
+
+func Diff(repoPath, file, hash string) (string, error) {
+	// git show <hash> -- <file> shows the patch for that file in that commit
+	cmd := exec.Command("git", "show", "--patch", hash, "--", file)
+	cmd.Dir = repoPath
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git show failed: %w", err)
+	}
+	return string(out), nil
+}
+
+func Undo(repoPath, hash string) error {
+	// Revert the specific changes from this commit without making a new commit yet
+	cmd := exec.Command("git", "revert", "-n", hash)
+	cmd.Dir = repoPath
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		// If revert fails (usually due to conflicts), we abort the revert to leave the repo clean
+		abortCmd := exec.Command("git", "revert", "--abort")
+		abortCmd.Dir = repoPath
+		abortCmd.Run()
+		return fmt.Errorf("this change overlaps with more recent edits and cannot be automatically undone")
+	}
+	return nil
+}

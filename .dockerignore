@@ -8,4 +8,3 @@ playwright-report/
 *.db
 *.log
 node_modules/
-singlenote

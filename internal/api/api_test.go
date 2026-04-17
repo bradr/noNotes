@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bradr/singlenote/internal/indexer"
+	"github.com/bradr/noNotes/internal/indexer"
 	// Using empty watcher as it's harder to mock and not strictly needed for toggle/append if we don't test SSE here
-	"github.com/bradr/singlenote/internal/watcher"
+	"github.com/bradr/noNotes/internal/watcher"
 )
 
 func TestHandleAppend(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bradr/singlenote/internal/git"
-	"github.com/bradr/singlenote/internal/indexer"
+	"github.com/bradr/noNotes/internal/git"
+	"github.com/bradr/noNotes/internal/indexer"
 	"github.com/fsnotify/fsnotify"
 )
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bradr/singlenote/internal/indexer"
+	"github.com/bradr/noNotes/internal/indexer"
 )
 
 func TestWatcherDebounce(t *testing.T) {

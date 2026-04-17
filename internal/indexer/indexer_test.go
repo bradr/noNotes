@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bradr/singlenote/internal/git"
+	"github.com/bradr/noNotes/internal/git"
 )
 
 func TestUpdateTasks(t *testing.T) {

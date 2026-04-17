@@ -11,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bradr/singlenote/internal/indexer"
-	"github.com/bradr/singlenote/internal/watcher"
+	"github.com/bradr/noNotes/internal/git"
+	"github.com/bradr/noNotes/internal/indexer"
+	"github.com/bradr/noNotes/internal/watcher"
 )
 
 type Server struct {
@@ -64,6 +65,9 @@ func (s *Server) SetupRoutes() http.Handler {
 	mux.HandleFunc("/activity", s.handleActivity)
 	mux.HandleFunc("/line/get", s.handleGetLine)
 	mux.HandleFunc("/line/update-date", s.handleUpdateLineDate)
+	mux.HandleFunc("/history", s.handleHistory)
+	mux.HandleFunc("/diff", s.handleDiff)
+	mux.HandleFunc("/revert", s.handleRevert)
 
 	fs := http.FileServer(http.Dir("web/static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))
@@ -265,4 +269,47 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
+	entries, err := git.History(s.repoPath, filepath.Base(s.filePath))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(entries)
+}
+
+func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
+	hash := r.URL.Query().Get("hash")
+	if hash == "" {
+		http.Error(w, "Hash required", http.StatusBadRequest)
+		return
+	}
+	diff, err := git.Diff(s.repoPath, filepath.Base(s.filePath), hash)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(diff))
+}
+
+func (s *Server) handleRevert(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	hash := r.FormValue("hash")
+	if hash == "" {
+		http.Error(w, "Hash required", http.StatusBadRequest)
+		return
+	}
+	err := git.Undo(s.repoPath, hash)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

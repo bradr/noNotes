@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	"github.com/bradr/noNotes/internal/git"
 )
@@ -23,7 +23,7 @@ type Task struct {
 }
 
 func New(dbPath string) (*Indexer, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}

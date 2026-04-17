@@ -1,5 +1,5 @@
 {{ range .Tasks }}
-<div class="task-item {{if .Done}}done{{end}}" {{ if .Context }}data-context="{{.Context}}"{{ end }}>
+<div class="task-item {{if .Done}}done{{end}}" data-line="{{.LineNum}}" {{ if .Context }}data-context="{{.Context}}"{{ end }}>
     <input type="checkbox" 
            hx-post="/tasks/toggle" 
            hx-swap="none"
@@ -10,7 +10,7 @@
         <span class="task-text">{{ highlight .Text $.Query }}</span>
         <span class="task-date">{{ formatDate .Timestamp }}</span>
     </div>
-    <button class="btn-jump" onclick="window.scrollToLine({{.LineNum}})" title="Jump to line">
+    <button class="btn-jump" onclick="window.jumpToLine({{.LineNum}})" title="Jump to line">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
             <polyline points="15 3 21 3 21 9"></polyline>

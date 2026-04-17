@@ -1056,6 +1056,25 @@ html {
     background: rgba(255, 255, 255, 0.02);
 }
 
+.btn-revert {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-revert:hover:not(:disabled) {
+    border-color: #f44336;
+    color: #f44336;
+}
+.btn-revert:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
 .history-item-diff {
     animation: accordionIn 0.3s var(--ease-out);
 }

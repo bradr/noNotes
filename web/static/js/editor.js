@@ -1,8 +1,102 @@
-import { basicSetup, EditorView } from "https://esm.sh/codemirror@6.0.1";
-import { Decoration, ViewPlugin } from "https://esm.sh/@codemirror/view@6.0.1";
-import { RangeSetBuilder, StateField, StateEffect } from "https://esm.sh/@codemirror/state@6.0.1";
-import { search, SearchQuery, setSearchQuery, getSearchQuery } from "https://esm.sh/@codemirror/search@6.5.6";
-import { markdown } from "https://esm.sh/@codemirror/lang-markdown@6.1.1";
+import { basicSetup, EditorView } from "https://esm.sh/codemirror@6.0.2?deps=@codemirror/view@6.38.4,@codemirror/state@6.5.2";
+import { Decoration, ViewPlugin } from "https://esm.sh/@codemirror/view@6.38.4?deps=@codemirror/state@6.5.2";
+import { StateField, StateEffect, RangeSetBuilder } from "https://esm.sh/@codemirror/state@6.5.2";
+import { markdown } from "https://esm.sh/@codemirror/lang-markdown@6.3.4?deps=@codemirror/view@6.38.4,@codemirror/state@6.5.2";
+
+const setSearchTerm = StateEffect.define();
+
+const searchTermField = StateField.define({
+    create: () => "",
+    update(value, tr) {
+        for (const e of tr.effects) if (e.is(setSearchTerm)) return e.value;
+        return value;
+    }
+});
+
+const searchMatchDeco = Decoration.mark({
+    class: "cm-searchMatch",
+    attributes: { style: "background-color: #ffd54f; color: #000; border-radius: 2px;" }
+});
+
+function buildSearchDecos(view) {
+    const term = view.state.field(searchTermField);
+    if (!term) return Decoration.none;
+    const needle = term.toLowerCase();
+    const builder = new RangeSetBuilder();
+    for (const { from, to } of view.visibleRanges) {
+        const text = view.state.doc.sliceString(from, to).toLowerCase();
+        let i = 0;
+        while ((i = text.indexOf(needle, i)) !== -1) {
+            builder.add(from + i, from + i + needle.length, searchMatchDeco);
+            i += needle.length || 1;
+        }
+    }
+    return builder.finish();
+}
+
+const searchHighlighter = ViewPlugin.fromClass(class {
+    constructor(view) { this.decorations = buildSearchDecos(view); }
+    update(update) {
+        const termChanged = update.state.field(searchTermField) !== update.startState.field(searchTermField);
+        if (update.docChanged || update.viewportChanged || termChanged) {
+            this.decorations = buildSearchDecos(update.view);
+        }
+    }
+}, { decorations: v => v.decorations });
+
+const checkboxClicker = EditorView.domEventHandlers({
+    mousedown(event, view) {
+        if (event.button !== 0 || event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return false;
+
+        if (filteredLineMap.length > 0) {
+            const p = view.posAtCoords({ x: event.clientX, y: event.clientY });
+            if (p == null) return false;
+            const editorLineNum = view.state.doc.lineAt(p).number;
+            const fileLineNum = filteredLineMap[editorLineNum - 1];
+            if (fileLineNum) {
+                event.preventDefault();
+                window.jumpToLine(fileLineNum);
+                return true;
+            }
+            return false;
+        }
+
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos == null) return false;
+        const line = view.state.doc.lineAt(pos);
+        const idx = line.text.search(/\[[ x]\]/);
+        if (idx < 0) return false;
+        const boxStart = line.from + idx;
+        const boxEnd = boxStart + 3;
+        if (pos < boxStart || pos > boxEnd) return false;
+        const current = view.state.doc.sliceString(boxStart + 1, boxStart + 2);
+        const next = current === ' ' ? 'x' : ' ';
+        view.dispatch({
+            changes: { from: boxStart + 1, to: boxStart + 2, insert: next }
+        });
+
+        const editorLineNum = line.number;
+        const fileLineNum = filteredLineMap.length > 0
+            ? filteredLineMap[editorLineNum - 1]
+            : editorLineNum;
+        const taskItem = document.querySelector(`.task-item[data-line="${fileLineNum}"]`);
+        if (taskItem) {
+            if (next === 'x') {
+                taskItem.style.pointerEvents = 'none';
+                taskItem.style.opacity = '0.4';
+                taskItem.style.transform = 'translateX(20px)';
+                setTimeout(() => taskItem.remove(), 400);
+            } else {
+                taskItem.classList.remove('done');
+                const cb = taskItem.querySelector('input[type=checkbox]');
+                if (cb) cb.checked = false;
+            }
+        }
+
+        event.preventDefault();
+        return true;
+    }
+});
 
 
 
@@ -17,42 +111,6 @@ let filteredLineMap = [];
 let saveTimeout;
 let lastSaveLocal = 0;
 let isRemoteUpdate = false;
-
-// searchMatchDeco for search highlights - use inline styles for guaranteed visibility
-const searchMatchDeco = Decoration.mark({ 
-    attributes: { style: "background-color: #ffd54f !important; color: #000 !important; border-radius: 3px; font-weight: 500;" },
-    class: "cm-searchMatch" 
-});
-
-
-// searchHighlighter uses CodeMirror's own SearchQuery to find matches
-const searchHighlighter = ViewPlugin.fromClass(class {
-    constructor(view) {
-        this.decorations = this.getDecos(view);
-    }
-    update(update) {
-        if (update.docChanged || update.transactions.some(tr => tr.effects.some(e => e.is(setSearchQuery)))) {
-            this.decorations = this.getDecos(update.view);
-        }
-    }
-    getDecos(view) {
-        const query = getSearchQuery(view.state);
-        console.log("Search Query in Editor:", query?.search);
-        if (!query || !query.valid || !query.search) return Decoration.none;
-
-        
-        const builder = new RangeSetBuilder();
-        const cursor = query.getCursor(view.state);
-        while (true) {
-            const { value, done } = cursor.next();
-            if (done) break;
-            builder.add(value.from, value.to, searchMatchDeco);
-        }
-        return builder.finish();
-    }
-}, {
-    decorations: v => v.decorations
-});
 
 let searchQuery = "";
 
@@ -189,14 +247,16 @@ async function loadTimeline(initialLoad = false) {
 function initEditor() {
     const container = document.getElementById('editor-container');
     if (!container) return;
+    if (editor) { editor.destroy(); editor = null; }
 
     editor = new EditorView({
         doc: fullText,
         extensions: [
             basicSetup,
             markdown(),
-            search({ top: true }),
+            searchTermField,
             searchHighlighter,
+            checkboxClicker,
             EditorView.lineWrapping,
             EditorView.updateListener.of((update) => {
                 if (update.docChanged && !isRemoteUpdate) {
@@ -275,7 +335,7 @@ function scheduleSave() {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: `text=${encodeURIComponent(editor.state.doc.toString())}`
         });
-    }, 1000);
+    }, 300);
 }
 
 function updateEditorFromRemote() {
@@ -403,11 +463,9 @@ function setupSearchOverlay() {
         }
 
         isRemoteUpdate = true;
-        // Dispatch the official setSearchQuery effect to trigger built-in highlighting
-        const queryObj = new SearchQuery({ search: query, caseSensitive: false, literal: true });
         editor.dispatch({
             changes: { from: 0, to: editor.state.doc.length, insert: textToShow },
-            effects: setSearchQuery.of(queryObj)
+            effects: setSearchTerm.of(query || "")
         });
         isRemoteUpdate = false;
         count.textContent = query ? `${totalMatches} results` : '';
@@ -449,6 +507,70 @@ window.scrollToLine = (lineNum) => {
     } catch (e) { }
 };
 
+window.jumpToLine = (fileLineNum) => {
+    if (!editor) return;
+    const input = document.getElementById('search-input');
+    const count = document.getElementById('search-count');
+    const container = document.getElementById('editor-container');
+    if (input) input.value = '';
+    if (count) count.textContent = '';
+    container?.classList.remove('filtering-active');
+    filteredLineMap = [];
+    searchQuery = '';
+
+    const lines = fullText.split('\n');
+    let pos = 0;
+    for (let i = 0; i < fileLineNum - 1 && i < lines.length; i++) {
+        pos += lines[i].length + 1;
+    }
+
+    isRemoteUpdate = true;
+    editor.dispatch({
+        changes: { from: 0, to: editor.state.doc.length, insert: fullText },
+        selection: { anchor: pos },
+        effects: [setSearchTerm.of(""), EditorView.scrollIntoView(pos, { y: 'start' })]
+    });
+    isRemoteUpdate = false;
+
+    requestAnimationFrame(() => {
+        try {
+            const line = editor.state.doc.line(fileLineNum);
+            editor.dispatch({
+                effects: EditorView.scrollIntoView(line.from, { y: 'start' })
+            });
+            editor.contentDOM.focus();
+        } catch (e) { }
+    });
+
+    if (window.htmx) {
+        htmx.ajax('GET', '/tasks', { target: '#task-list', swap: 'innerHTML' });
+    }
+};
+
+window.toggleTaskInEditor = (fileLineNum) => {
+    if (!editor) return;
+    const editorLineNum = filteredLineMap.length > 0
+        ? filteredLineMap.indexOf(fileLineNum) + 1
+        : fileLineNum;
+    if (editorLineNum < 1) return;
+    let line;
+    try { line = editor.state.doc.line(editorLineNum); } catch (e) { return; }
+    let newText;
+    if (line.text.includes("[ ]")) newText = line.text.replace("[ ]", "[x]");
+    else if (line.text.includes("[x]")) newText = line.text.replace("[x]", "[ ]");
+    else return;
+
+    editor.dispatch({
+        changes: { from: line.from, to: line.to, insert: newText }
+    });
+
+    const lines = fullText.split("\n");
+    if (lines[fileLineNum - 1] !== undefined) {
+        lines[fileLineNum - 1] = newText;
+        fullText = lines.join("\n");
+    }
+};
+
 window.addNewNote = () => {
     if (!editor) return;
     if (window.clearSearch) window.clearSearch();
@@ -478,8 +600,69 @@ function setupHistoryModal() {
         data.forEach(entry => {
             const item = document.createElement('div');
             item.className = 'history-item';
-            item.innerHTML = `<span class="history-time">${new Date(entry.timestamp * 1000).toLocaleString()}</span>`;
-            item.onclick = () => console.log("Diff logic omitted for simplicity");
+
+            const previewLines = (entry.preview || []).map(l => {
+                const isAdd = l.startsWith('+');
+                const color = isAdd ? 'var(--accent, #4caf50)' : '#f44336';
+                const escaped = l.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return `<div style="color:${color};font-size:11px;font-family:monospace;white-space:pre-wrap;">${escaped}</div>`;
+            }).join('');
+
+            item.innerHTML = `
+                <div class="history-item-header">
+                    <span class="history-time">${new Date(entry.timestamp * 1000).toLocaleString()}</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <span class="history-stats">
+                            ${entry.additions ? `<span class="stat-add">+${entry.additions}</span>` : ''}
+                            ${entry.deletions ? `<span class="stat-del">-${entry.deletions}</span>` : ''}
+                        </span>
+                        <button class="btn-revert" data-hash="${entry.hash}">Revert</button>
+                    </span>
+                </div>
+                ${entry.subject ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${entry.subject}</div>` : ''}
+                ${previewLines ? `<div class="history-preview-list">${previewLines}</div>` : ''}`;
+
+            item.querySelector('.btn-revert').onclick = async (e) => {
+                e.stopPropagation();
+                if (!confirm('Revert this change? This will undo that specific commit.')) return;
+                const btn = e.currentTarget;
+                btn.textContent = 'Reverting…';
+                btn.disabled = true;
+                const r = await fetch('/revert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `hash=${entry.hash}`
+                });
+                if (r.ok) {
+                    modal.style.display = 'none';
+                    loadTimeline(false);
+                } else {
+                    const msg = await r.text();
+                    btn.textContent = 'Revert';
+                    btn.disabled = false;
+                    alert(msg);
+                }
+            };
+
+            item.style.cursor = 'pointer';
+            let diffEl = null;
+            item.onclick = async () => {
+                if (diffEl) { diffEl.remove(); diffEl = null; return; }
+                diffEl = document.createElement('div');
+                diffEl.className = 'history-item-diff';
+                diffEl.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-size:12px;">Loading diff…</div>';
+                item.appendChild(diffEl);
+                const r = await fetch(`/diff?hash=${entry.hash}`);
+                const text = await r.text();
+                const escaped = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const colored = escaped.split('\n').map(l => {
+                    if (l.startsWith('+') && !l.startsWith('+++')) return `<span style="color:#4caf50">${l}</span>`;
+                    if (l.startsWith('-') && !l.startsWith('---')) return `<span style="color:#f44336">${l}</span>`;
+                    return `<span style="color:var(--text-muted)">${l}</span>`;
+                }).join('\n');
+                diffEl.innerHTML = `<pre class="diff-content-inner">${colored}</pre>`;
+            };
+
             list.appendChild(item);
         });
     };

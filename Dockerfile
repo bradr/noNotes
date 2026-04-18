@@ -13,15 +13,6 @@ RUN go mod download
 # Copy the rest of the source code
 COPY . .
 
-# Pre-initialize environment (optional, since main.go also does this)
-RUN mkdir -p notes && \
-    git init notes && \
-    git -C notes config user.email "you@example.com" && \
-    git -C notes config user.name "noNotes" && \
-    echo "# noNotes Init" > notes/notes.md && \
-    git -C notes add notes.md && \
-    git -C notes commit -m "Initial commit"
-
 # Build the binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o nonotes cmd/nonotes/main.go
 
@@ -38,9 +29,6 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/nonotes .
-
-# Copy initialized files from builder
-COPY --from=builder /app/notes/ ./notes/
 
 # Copy web assets (templates and static files)
 COPY web/ ./web/

@@ -1,10 +1,8 @@
 # Stage 1: Builder
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
-# Install build dependencies:
-# - gcc/musl-dev for go-sqlite3 (CGO)
-# - git for repository initialization
-RUN apk add --no-cache gcc musl-dev git
+# git needed for repository initialization during build
+RUN apk add --no-cache git
 
 WORKDIR /app
 
@@ -25,7 +23,7 @@ RUN mkdir -p notes && \
     git -C notes commit -m "Initial commit"
 
 # Build the binary
-RUN CGO_ENABLED=1 GOOS=linux go build -o nonotes cmd/nonotes/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o nonotes cmd/nonotes/main.go
 
 # Stage 2: Runtime
 FROM alpine:latest

@@ -34,6 +34,31 @@ function buildSearchDecos(view) {
     return builder.finish();
 }
 
+const listLineDeco = Decoration.line({ class: "cm-list-line" });
+const listLineRe = /^(\s*[-*+]|\s*\d+[.)]) /;
+
+function buildListLineDecos(view) {
+    const builder = new RangeSetBuilder();
+    for (const { from, to } of view.visibleRanges) {
+        let pos = from;
+        while (pos <= to) {
+            const line = view.state.doc.lineAt(pos);
+            if (listLineRe.test(line.text)) builder.add(line.from, line.from, listLineDeco);
+            pos = line.to + 1;
+        }
+    }
+    return builder.finish();
+}
+
+const listLineHighlighter = ViewPlugin.fromClass(class {
+    constructor(view) { this.decorations = buildListLineDecos(view); }
+    update(update) {
+        if (update.docChanged || update.viewportChanged) {
+            this.decorations = buildListLineDecos(update.view);
+        }
+    }
+}, { decorations: v => v.decorations });
+
 const searchHighlighter = ViewPlugin.fromClass(class {
     constructor(view) { this.decorations = buildSearchDecos(view); }
     update(update) {
@@ -256,6 +281,7 @@ function initEditor() {
             markdown(),
             searchTermField,
             searchHighlighter,
+            listLineHighlighter,
             checkboxClicker,
             EditorView.lineWrapping,
             EditorView.updateListener.of((update) => {

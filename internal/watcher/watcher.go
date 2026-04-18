@@ -15,24 +15,27 @@ import (
 )
 
 type Watcher struct {
-	repoPath      string
-	filePath      string
-	indexer       *indexer.Indexer
-	debounceTimer *time.Timer
-	debounceWait  time.Duration
-	mu            sync.Mutex
-	
-	clients       map[chan struct{}]bool
-	muClients     sync.Mutex
+	repoPath       string
+	filePath       string
+	indexer        *indexer.Indexer
+	debounceTimer  *time.Timer
+	debounceWait   time.Duration
+	commitTimer    *time.Timer
+	commitInterval time.Duration
+	mu             sync.Mutex
+
+	clients   map[chan bool]bool
+	muClients sync.Mutex
 }
 
-func New(repoPath, fileName string, idx *indexer.Indexer, debounce time.Duration) *Watcher {
+func New(repoPath, fileName string, idx *indexer.Indexer, debounce, commitInterval time.Duration) *Watcher {
 	return &Watcher{
-		repoPath:     repoPath,
-		filePath:     filepath.Join(repoPath, fileName),
-		indexer:      idx,
-		debounceWait: debounce,
-		clients:      make(map[chan struct{}]bool),
+		repoPath:       repoPath,
+		filePath:       filepath.Join(repoPath, fileName),
+		indexer:        idx,
+		debounceWait:   debounce,
+		commitInterval: commitInterval,
+		clients:        make(map[chan bool]bool),
 	}
 }
 
@@ -49,7 +52,6 @@ func (w *Watcher) Start() error {
 				if !ok {
 					return
 				}
-				// We only care about edits/creates to our specific file
 				if event.Name == w.filePath && (event.Has(fsnotify.Write) || event.Has(fsnotify.Create)) {
 					w.triggerDebounce()
 				}
@@ -57,22 +59,24 @@ func (w *Watcher) Start() error {
 				if !ok {
 					return
 				}
-				log.Println("error:", err)
+				log.Println("watcher error:", err)
 			}
 		}
 	}()
 
-	err = watcher.Add(w.repoPath) // Watch the directory to catch file creation
-	if err != nil {
+	if err = watcher.Add(w.repoPath); err != nil {
 		return err
 	}
-	
-	// Run initial index on start
+
+	// Full index on startup so timeline timestamps are populated from the start.
 	w.commitAndIndex()
 
 	return nil
 }
 
+// triggerDebounce resets both timers on every file change:
+// - short debounce fires reIndex (tasks + broadcast, no git)
+// - commit timer fires gitCommit (git add/commit/blame, timeline timestamps)
 func (w *Watcher) triggerDebounce() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -80,54 +84,96 @@ func (w *Watcher) triggerDebounce() {
 	if w.debounceTimer != nil {
 		w.debounceTimer.Stop()
 	}
+	w.debounceTimer = time.AfterFunc(w.debounceWait, w.reIndex)
 
-	w.debounceTimer = time.AfterFunc(w.debounceWait, func() {
-		w.commitAndIndex()
-	})
+	if w.commitTimer != nil {
+		w.commitTimer.Stop()
+	}
+	w.commitTimer = time.AfterFunc(w.commitInterval, w.gitCommit)
 }
 
-func (w *Watcher) commitAndIndex() {
+// reIndex reads the file directly and updates the tasks table without touching
+// git. Fast enough to run on every save.
+func (w *Watcher) reIndex() {
+	content, err := os.ReadFile(w.filePath)
+	if err != nil {
+		log.Printf("reIndex: read failed: %v", err)
+		return
+	}
+	text := string(content)
+	if err := w.indexer.UpdateTimelineFromText(text); err != nil {
+		log.Printf("reIndex: UpdateTimelineFromText failed: %v", err)
+	}
+	tasksChanged, err := w.indexer.UpdateTasksFromText(text)
+	if err != nil {
+		log.Printf("reIndex: UpdateTasksFromText failed: %v", err)
+	}
+	w.Broadcast(tasksChanged)
+	log.Println("Fast re-index complete.")
+}
+
+// gitCommit does a git add+commit, then re-runs blame to refresh the per-line
+// timestamps used for hover dates and the timeline.
+func (w *Watcher) gitCommit() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	
-	// 1. Git add and commit
-	err := git.Add(w.repoPath, "notes.md") // HARDCODED for now based on PRD
-	if err != nil {
+
+	fileName := filepath.Base(w.filePath)
+
+	if err := git.Add(w.repoPath, fileName); err != nil {
 		log.Printf("Git add failed: %v", err)
 	}
-	
-	err = git.Commit(w.repoPath, "Auto-commit from SingleNote")
-	if err != nil {
-		// Can happen if nothing changed, that's fine
-		log.Printf("Git commit: %v (might mean no changes)", err)
+	if err := git.Commit(w.repoPath, "Auto-commit from noNotes"); err != nil {
+		log.Printf("Git commit: %v (no changes?)", err)
 	}
 
-	// 2. Git Blame over the file
-	lines, err := git.Blame(w.repoPath, "notes.md")
+	lines, err := git.Blame(w.repoPath, fileName)
 	if err != nil {
 		log.Printf("Git blame failed: %v", err)
 		return
 	}
-
-	// 3. Update SQLite Indexes
-	err = w.indexer.UpdateTimeline(lines)
-	if err != nil {
+	if err := w.indexer.UpdateTimeline(lines); err != nil {
 		log.Printf("UpdateTimeline failed: %v", err)
 	}
-
-	err = w.indexer.UpdateTasks(lines)
-	if err != nil {
+	if err := w.indexer.UpdateTasks(lines); err != nil {
 		log.Printf("UpdateTasks failed: %v", err)
 	}
-	
-	// 4. Notify all frontends
-	w.Broadcast()
 
-	log.Println("Successfully indexed file changes.")
+	w.Broadcast(true)
+	log.Println("Git commit and timeline index complete.")
 }
 
-// ToggleLine flips [ ] ↔ [x] on a specific line, holding the mutex for the
-// entire read-modify-write so concurrent requests can't clobber each other.
+// commitAndIndex is the full pipeline used at startup only.
+func (w *Watcher) commitAndIndex() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	fileName := filepath.Base(w.filePath)
+
+	if err := git.Add(w.repoPath, fileName); err != nil {
+		log.Printf("Git add failed: %v", err)
+	}
+	if err := git.Commit(w.repoPath, "Auto-commit from noNotes"); err != nil {
+		log.Printf("Git commit: %v (no changes?)", err)
+	}
+
+	lines, err := git.Blame(w.repoPath, fileName)
+	if err != nil {
+		log.Printf("Git blame failed: %v", err)
+		return
+	}
+	if err := w.indexer.UpdateTimeline(lines); err != nil {
+		log.Printf("UpdateTimeline failed: %v", err)
+	}
+	if err := w.indexer.UpdateTasks(lines); err != nil {
+		log.Printf("UpdateTasks failed: %v", err)
+	}
+
+	w.Broadcast(true)
+	log.Println("Startup index complete.")
+}
+
+// ToggleLine flips [ ] ↔ [x] on a specific line under the mutex.
 func (w *Watcher) ToggleLine(filePath string, lineNum int) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -152,15 +198,14 @@ func (w *Watcher) ToggleLine(filePath string, lineNum int) error {
 	return os.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
 }
 
-// WriteFile writes content to the notes file under the watcher mutex,
-// serializing with commitAndIndex so git blame never sees a partial write.
+// WriteFile writes content to the notes file under the mutex.
 func (w *Watcher) WriteFile(filePath string, content []byte) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return os.WriteFile(filePath, content, 0644)
 }
 
-// AppendFile appends text to the notes file under the watcher mutex.
+// AppendFile appends text to the notes file under the mutex.
 func (w *Watcher) AppendFile(filePath string, text string) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -173,30 +218,30 @@ func (w *Watcher) AppendFile(filePath string, text string) error {
 	return err
 }
 
-func (w *Watcher) RegisterClient() chan struct{} {
+func (w *Watcher) RegisterClient() chan bool {
 	w.muClients.Lock()
 	defer w.muClients.Unlock()
-	ch := make(chan struct{}, 1)
+	ch := make(chan bool, 1)
 	w.clients[ch] = true
 	return ch
 }
 
-func (w *Watcher) UnregisterClient(ch chan struct{}) {
+func (w *Watcher) UnregisterClient(ch chan bool) {
 	w.muClients.Lock()
 	defer w.muClients.Unlock()
 	delete(w.clients, ch)
 	close(ch)
 }
 
-func (w *Watcher) Broadcast() {
+// Broadcast notifies all SSE clients. tasksChanged signals whether the task
+// list needs to reload (false = only timeline/editor content changed).
+func (w *Watcher) Broadcast(tasksChanged bool) {
 	w.muClients.Lock()
 	defer w.muClients.Unlock()
 	for ch := range w.clients {
 		select {
-		case ch <- struct{}{}:
+		case ch <- tasksChanged:
 		default:
 		}
 	}
-
-	log.Println("Successfully indexed file changes.")
 }

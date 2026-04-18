@@ -1,7 +1,7 @@
 .PHONY: run test build clean
 
 run:
-	go run cmd/singlenote/main.go
+	go run cmd/nonotes/main.go
 
 test:
 	go test -v ./...
@@ -10,8 +10,8 @@ test-e2e:
 	cd e2e && npx playwright test
 
 build:
-	go build -o singlenote cmd/singlenote/main.go
+	go build -o nonotes cmd/nonotes/main.go
 
 clean:
-	rm -f singlenote singlenote.db
+	rm -f nonotes nonotes.db
 

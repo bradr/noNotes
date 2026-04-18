@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,7 +20,7 @@ import (
 func main() {
 	repoPath := "notes"
 	fileName := "notes.md"
-	dbPath := "singlenote.db"
+	dbPath := "nonotes.db"
 
 	if err := git.ConfigureSafeDirectory(repoPath); err != nil {
 		log.Printf("Warning: failed to configure git safe directory: %v", err)
@@ -37,7 +38,7 @@ func main() {
 
 	fullFilePath := filepath.Join(repoPath, fileName)
 	if _, err := os.Stat(fullFilePath); os.IsNotExist(err) {
-		if err := os.WriteFile(fullFilePath, []byte("# SingleNote Init\n"), 0644); err != nil {
+		if err := os.WriteFile(fullFilePath, []byte("# noNotes\n"), 0644); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -48,7 +49,7 @@ func main() {
 	}
 	defer idx.Close()
 
-	w := watcher.New(repoPath, fileName, idx, 2*time.Second)
+	w := watcher.New(repoPath, fileName, idx, 500*time.Millisecond, 5*time.Minute)
 	if err := w.Start(); err != nil {
 		log.Fatalf("Failed to start watcher: %v", err)
 	}
@@ -58,9 +59,14 @@ func main() {
 		log.Fatalf("Failed to initialize API server: %v", err)
 	}
 
+	baseCtx, cancelBase := context.WithCancel(context.Background())
+
 	httpServer := &http.Server{
 		Addr:    ":8080",
 		Handler: server.SetupRoutes(),
+		// Propagate the base context to all requests so SSE handlers
+		// see r.Context().Done() fire immediately on shutdown.
+		BaseContext: func(_ net.Listener) context.Context { return baseCtx },
 	}
 
 	quit := make(chan os.Signal, 1)
@@ -75,7 +81,8 @@ func main() {
 
 	<-quit
 	log.Println("Shutting down...")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	cancelBase() // closes SSE connections immediately
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Printf("Shutdown error: %v", err)

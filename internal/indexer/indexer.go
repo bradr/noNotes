@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"regexp"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -251,5 +252,147 @@ func (idx *Indexer) GetLine(lineNum int) (TimelineRow, error) {
 func (idx *Indexer) UpdateLineDate(lineNum int, createdAt int64, modifiedAt int64) error {
 	_, err := idx.db.Exec("UPDATE timeline SET created_at = ?, timestamp = ? WHERE line_num = ?", createdAt, modifiedAt, lineNum)
 	return err
+}
+
+// UpdateTimelineFromText rebuilds the timeline table from raw file content
+// without git blame. Timestamps are preserved for lines whose text matches an
+// existing entry; new lines get the current time. gitCommit() will later
+// overwrite with precise blame timestamps.
+func (idx *Indexer) UpdateTimelineFromText(content string) error {
+	type entry struct{ ts, ca int64 }
+	old := make(map[string]entry)
+	rows, err := idx.db.Query("SELECT text, timestamp, created_at FROM timeline")
+	if err == nil {
+		for rows.Next() {
+			var txt string
+			var e entry
+			if err := rows.Scan(&txt, &e.ts, &e.ca); err == nil {
+				old[txt] = e
+			}
+		}
+		rows.Close()
+	}
+
+	tx, err := idx.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err = tx.Exec("DELETE FROM timeline"); err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("INSERT INTO timeline (line_num, timestamp, created_at, text) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now().Unix()
+	for i, line := range strings.Split(content, "\n") {
+		ts, ca := now, now
+		if e, ok := old[line]; ok {
+			ts, ca = e.ts, e.ca
+		}
+		if _, err = stmt.Exec(i+1, ts, ca, line); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// UpdateTasksFromText parses tasks directly from file content without needing
+// git blame. Returns true if the task list changed (added, removed, or toggled).
+func (idx *Indexer) UpdateTasksFromText(content string) (bool, error) {
+	type existing struct {
+		lineNum int
+		done    bool
+		ca      int64
+	}
+	old := make(map[string]existing)
+	rows, err := idx.db.Query("SELECT text, line_num, done, created_at FROM tasks")
+	if err == nil {
+		for rows.Next() {
+			var txt string
+			var e existing
+			if err := rows.Scan(&txt, &e.lineNum, &e.done, &e.ca); err == nil {
+				old[txt] = e
+			}
+		}
+		rows.Close()
+	}
+
+	type newTask struct {
+		lineNum int
+		text    string
+		context string
+		done    bool
+	}
+	now := time.Now().Unix()
+	var incoming []newTask
+	ctx := ""
+	for i, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			ctx = strings.TrimLeft(trimmed, "# ")
+			continue
+		}
+		matches := taskRegex.FindStringSubmatch(trimmed)
+		if len(matches) < 3 {
+			continue
+		}
+		incoming = append(incoming, newTask{
+			lineNum: i + 1,
+			text:    matches[2],
+			context: ctx,
+			done:    matches[1] == "x",
+		})
+	}
+
+	// Detect changes: different count, or any task added/removed/toggled/moved.
+	changed := len(incoming) != len(old)
+	if !changed {
+		for _, t := range incoming {
+			e, exists := old[t.text]
+			if !exists || e.done != t.done || e.lineNum != t.lineNum {
+				changed = true
+				break
+			}
+		}
+	}
+
+	if !changed {
+		return false, nil
+	}
+
+	tx, err := idx.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	if _, err = tx.Exec("DELETE FROM tasks"); err != nil {
+		return false, err
+	}
+
+	stmt, err := tx.Prepare("INSERT INTO tasks (line_num, timestamp, created_at, text, context, done) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		return false, err
+	}
+	defer stmt.Close()
+
+	for _, t := range incoming {
+		ca := now
+		if e, ok := old[t.text]; ok {
+			ca = e.ca
+		}
+		if _, err = stmt.Exec(t.lineNum, now, ca, t.text, t.context, t.done); err != nil {
+			return false, err
+		}
+	}
+
+	return true, tx.Commit()
 }
 

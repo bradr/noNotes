@@ -25,7 +25,7 @@ RUN mkdir -p notes && \
     git -C notes commit -m "Initial commit"
 
 # Build the binary
-RUN CGO_ENABLED=1 GOOS=linux go build -o singlenote cmd/singlenote/main.go
+RUN CGO_ENABLED=1 GOOS=linux go build -o nonotes cmd/nonotes/main.go
 
 # Stage 2: Runtime
 FROM alpine:latest
@@ -39,7 +39,7 @@ RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/singlenote .
+COPY --from=builder /app/nonotes .
 
 # Copy initialized files from builder
 COPY --from=builder /app/notes/ ./notes/
@@ -52,4 +52,4 @@ COPY web/ ./web/
 EXPOSE 8080
 
 # Run the app
-CMD ["./singlenote"]
+CMD ["./nonotes"]

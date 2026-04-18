@@ -461,9 +461,10 @@ function setupSearchOverlay() {
 
 try {
     const evtSource = new EventSource('/events');
-    evtSource.addEventListener('update', () => {
+    evtSource.addEventListener('update', (e) => {
+        const data = JSON.parse(e.data);
         loadTimeline(false);
-        loadTasks();
+        if (data.tasks) loadTasks();
     });
 } catch (e) { }
 

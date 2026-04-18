@@ -12,6 +12,6 @@ e2e/playwright-report/
 e2e/test-results/
 e2e/scripts/repro_*_
 e2e/node_modules
-singlenote.db
+nonotes.db
 PRD.md
 .claude

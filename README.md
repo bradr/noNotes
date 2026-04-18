@@ -36,7 +36,7 @@ noNotes is a minimalist, append-only note-taking application designed for a dist
    ```bash
    docker run -p 8080:8080 \
      -v $(pwd)/notes:/app/notes \
-     -v $(pwd)/singlenote.db:/app/singlenote.db \
+     -v $(pwd)/nonotes.db:/app/nonotes.db \
      nonotes
    ```
 
@@ -82,7 +82,7 @@ make test-e2e
 
 ## 📁 Project Structure
 
-- `cmd/singlenote/`: Application entry point.
+- `cmd/nonotes/`: Application entry point.
 - `internal/`: Core business logic.
   - `api/`: HTTP server and routes.
   - `git/`: Git interaction logic for history and blame.

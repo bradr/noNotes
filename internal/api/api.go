@@ -277,8 +277,12 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		select {
-		case <-notifyCh:
-			if _, err := fmt.Fprintf(w, "event: update\ndata: {}\n\n"); err != nil {
+		case tasksChanged := <-notifyCh:
+			tasks := "false"
+			if tasksChanged {
+				tasks = "true"
+			}
+			if _, err := fmt.Fprintf(w, "event: update\ndata: {\"tasks\":%s}\n\n", tasks); err != nil {
 				return
 			}
 			flusher.Flush()

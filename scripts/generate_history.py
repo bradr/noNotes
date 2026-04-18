@@ -24,7 +24,7 @@ entries = [
     ("Design the Scrubber UI in Figma #design", False),
     ("Fix the memory leak in Go service", True),
     ("Great weather today! Walked 5 miles.", False),
-    ("Draft the PRD for SingleNote #project-greenfield", False),
+    ("Draft the PRD for noNotes #project-greenfield", False),
     ("Explore CodeMirror 6 custom extensions", False),
     ("Order new keyboard", True),
 ]
@@ -32,7 +32,7 @@ entries = [
 # Generate ~100 commits
 current_date = start_date
 with open(file_path, 'w') as f:
-    f.write("# SingleNote History\n\n")
+    f.write("# noNotes History\n\n")
 
 subprocess.run(["git", "add", "notes.md"], cwd=repo_dir, check=True)
 subprocess.run(["git", "commit", "-m", "Initial commit", "--date", current_date.isoformat()], cwd=repo_dir, check=True)

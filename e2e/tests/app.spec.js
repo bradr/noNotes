@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test.describe('SingleNote App', () => {
+test.describe('noNotes App', () => {
     test('should have the correct title', async ({ page }) => {
         await page.goto('/');
         await expect(page).toHaveTitle(/noNotes/);

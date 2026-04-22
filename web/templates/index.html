@@ -71,6 +71,7 @@
                         </svg>
                     </button>
 
+
                     <!-- Theme Toggle -->
                     <button id="btn-theme" aria-label="Toggle theme">
                         <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -90,6 +91,15 @@
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                         </svg>
                     </button>
+
+                    <!-- Toggle Sidebar (Hamburger) -->
+                    <button id="btn-open-sidebar" aria-label="Open sidebar" title="Open sidebar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
                 </div>
             </header>
 
@@ -101,7 +111,10 @@
 
         <!-- Side Panel (Permanent, Full Vertical) -->
         <aside id="side-panel">
-            <div class="side-panel-header">
+            <div class="side-panel-header" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; justify-content: flex-end;">
+                    <button id="btn-close-sidebar" aria-label="Close sidebar" title="Close sidebar" style="background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 15px; padding: 4px;">✕</button>
+                </div>
                 <div class="search-wrapper">
                     <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2">
@@ -109,9 +122,9 @@
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
                     <input type="text" id="search-input" placeholder="Filter notes..." autocomplete="off">
-                    <span id="search-count">0 results</span>
+                    <button id="btn-clear-search" aria-label="Clear search" title="Clear search" style="background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 0 4px;">✕</button>
+                    <span id="search-count" style="margin-left: 4px;">0 results</span>
                 </div>
-                <button id="btn-clear-search" aria-label="Clear search" title="Clear search">✕</button>
             </div>
 
             <!-- Calendar Widget -->
@@ -256,10 +269,42 @@
             localStorage.setItem('theme', nextTheme);
         });
 
+        // Sidebar Toggle Logic
+        const btnOpenSidebar = document.getElementById('btn-open-sidebar');
+        const btnCloseSidebar = document.getElementById('btn-close-sidebar');
+
+        btnOpenSidebar.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                document.body.classList.add('sidebar-open-mobile');
+            } else {
+                document.body.classList.remove('sidebar-closed');
+            }
+        });
+
+        btnCloseSidebar.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                document.body.classList.remove('sidebar-open-mobile');
+            } else {
+                document.body.classList.add('sidebar-closed');
+            }
+        });
+
+        // Expose close handler for editor navigations on mobile
+        window.closeMobileSidebar = () => {
+            if (window.innerWidth <= 768) {
+                document.body.classList.remove('sidebar-open-mobile');
+            }
+        };
+
         // Search button logic
         const btnSearch = document.getElementById('btn-search');
 
         btnSearch.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                document.body.classList.add('sidebar-open-mobile');
+            } else {
+                document.body.classList.remove('sidebar-closed');
+            }
             searchInput.focus();
             searchInput.select();
         });
@@ -269,6 +314,11 @@
             if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
                 e.preventDefault();
                 e.stopPropagation();
+                if (window.innerWidth <= 768) {
+                    document.body.classList.add('sidebar-open-mobile');
+                } else {
+                    document.body.classList.remove('sidebar-closed');
+                }
                 searchInput.focus();
                 searchInput.select();
             }

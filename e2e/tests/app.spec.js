@@ -131,4 +131,26 @@ test.describe('noNotes App', () => {
 
         expect(cursorLine).toBe(expectedLineNum);
     });
+
+    test('should indent and unindent selection with Tab/Shift-Tab', async ({ page }) => {
+        await page.goto('/');
+        await page.focus('.cm-content');
+
+        await page.evaluate(() => {
+            window.editor.dispatch({
+                changes: { from: 0, to: window.editor.state.doc.length, insert: 'line1\nline2' }
+            });
+            window.editor.dispatch({
+                selection: { anchor: 0, head: window.editor.state.doc.length }
+            });
+        });
+
+        await page.keyboard.press('Tab');
+        let content = await page.evaluate(() => window.editor.state.doc.toString());
+        expect(content).toBe('  line1\n  line2');
+
+        await page.keyboard.press('Shift+Tab');
+        content = await page.evaluate(() => window.editor.state.doc.toString());
+        expect(content).toBe('line1\nline2');
+    });
 });

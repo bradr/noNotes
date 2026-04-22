@@ -39,7 +39,6 @@ func Init(repoPath string) error {
 	return nil
 }
 
-
 type BlameLine struct {
 	Timestamp int64
 	Text      string
@@ -70,14 +69,14 @@ func Blame(repoPath, file string) ([]BlameLine, error) {
 
 	var results []BlameLine
 	scanner := bufio.NewScanner(bytes.NewReader(out))
-	
+
 	var currentLineNum int
 	var currentSHA string
 	commitTimestamps := make(map[string]int64)
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		if len(line) == 0 {
 			continue
 		}
@@ -96,9 +95,9 @@ func Blame(repoPath, file string) ([]BlameLine, error) {
 		if len(parts) == 0 {
 			continue
 		}
-		
+
 		key := parts[0]
-		
+
 		if len(key) == 40 {
 			currentSHA = key
 			currentLineNum++
@@ -107,7 +106,7 @@ func Blame(repoPath, file string) ([]BlameLine, error) {
 			commitTimestamps[currentSHA] = t
 		}
 	}
-	
+
 	return results, nil
 }
 
@@ -116,7 +115,7 @@ type LogEntry struct {
 	Timestamp int64    `json:"timestamp"`
 	Subject   string   `json:"subject"`
 	Additions int      `json:"additions"`
-	Deletions int    `json:"deletions"`
+	Deletions int      `json:"deletions"`
 	Preview   []string `json:"preview"`
 }
 
@@ -198,10 +197,8 @@ func Undo(repoPath, hash string) error {
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		// If revert fails (usually due to conflicts), we abort the revert to leave the repo clean
-		abortCmd := exec.Command("git", "revert", "--abort")
-		abortCmd.Dir = repoPath
-		abortCmd.Run()
-		return fmt.Errorf("this change overlaps with more recent edits and cannot be automatically undone")
+		exec.Command("git", "revert", "--abort").Run()
+		return fmt.Errorf("This change overlaps with more recent edits and cannot be automatically undone")
 	}
 	return nil
 }

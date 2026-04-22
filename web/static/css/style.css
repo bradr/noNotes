@@ -1144,3 +1144,125 @@ html {
         transform: scale(1) translateY(0);
     }
 }
+/* ── Sidebar Toggle states & Mobile ────────────────────────────────────────── */
+
+body.sidebar-closed #side-panel {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    #app {
+        position: relative;
+    }
+
+    #side-panel {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        z-index: 2000;
+        transform: translateX(100%);
+        transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+        display: flex !important;
+        visibility: hidden;
+    }
+
+    body.sidebar-open-mobile #side-panel {
+        transform: translateX(0);
+        visibility: visible;
+    }
+}
+
+/* Floating Sidebar Toggle */
+.floating-toggle {
+    position: fixed;
+    top: 24px;
+    right: var(--panel-w);
+    transform: translateX(50%);
+    width: 34px;
+    height: 34px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2500;
+    color: var(--text-muted);
+    transition: right 0.3s cubic-bezier(0.22, 1, 0.36, 1), transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), color 0.2s, background 0.2s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.floating-toggle:hover {
+    color: var(--text);
+    background: var(--bg);
+    border-color: var(--accent);
+}
+
+.floating-toggle svg {
+    width: 20px;
+    height: 20px;
+}
+
+.floating-toggle .icon-expand {
+    display: none;
+}
+
+body.sidebar-closed .floating-toggle {
+    right: 20px;
+    transform: none;
+}
+
+body.sidebar-closed .floating-toggle .icon-collapse {
+    display: none;
+}
+
+body.sidebar-closed .floating-toggle .icon-expand {
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .floating-toggle {
+        right: 20px;
+        transform: none;
+    }
+
+    .floating-toggle .icon-collapse {
+        display: none;
+    }
+
+    .floating-toggle .icon-expand {
+        display: block;
+    }
+
+    body.sidebar-open-mobile .floating-toggle {
+        right: 20px;
+        transform: none;
+    }
+
+    body.sidebar-open-mobile .floating-toggle .icon-collapse {
+        display: block;
+    }
+
+    body.sidebar-open-mobile .floating-toggle .icon-expand {
+        display: none;
+    }
+}
+
+/* Sidebar Hamburger Menu */
+#btn-open-sidebar {
+    display: none;
+}
+
+body.sidebar-closed #btn-open-sidebar {
+    display: flex;
+}
+
+@media (max-width: 768px) {
+    #btn-open-sidebar {
+        display: flex;
+    }
+}

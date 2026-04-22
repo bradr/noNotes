@@ -1,7 +1,8 @@
 import { basicSetup, EditorView } from "https://esm.sh/codemirror@6.0.2?deps=@codemirror/view@6.38.4,@codemirror/state@6.5.2";
-import { Decoration, ViewPlugin } from "https://esm.sh/@codemirror/view@6.38.4?deps=@codemirror/state@6.5.2";
+import { Decoration, ViewPlugin, keymap } from "https://esm.sh/@codemirror/view@6.38.4?deps=@codemirror/state@6.5.2";
 import { StateField, StateEffect, RangeSetBuilder } from "https://esm.sh/@codemirror/state@6.5.2";
 import { markdown } from "https://esm.sh/@codemirror/lang-markdown@6.3.4?deps=@codemirror/view@6.38.4,@codemirror/state@6.5.2";
+import { indentWithTab } from "https://esm.sh/@codemirror/commands@6.7.1?deps=@codemirror/view@6.38.4,@codemirror/state@6.5.2";
 
 const setSearchTerm = StateEffect.define();
 
@@ -283,6 +284,7 @@ function initEditor() {
             searchHighlighter,
             listLineHighlighter,
             checkboxClicker,
+            keymap.of([indentWithTab]),
             EditorView.lineWrapping,
             EditorView.updateListener.of((update) => {
                 if (update.docChanged && !isRemoteUpdate) {
@@ -525,6 +527,7 @@ loadTimeline(true);
 
 window.scrollToLine = (lineNum) => {
     if (!editor) return;
+    if (window.closeMobileSidebar) window.closeMobileSidebar();
     try {
         const line = editor.state.doc.line(lineNum);
         editor.dispatch({
@@ -537,6 +540,7 @@ window.scrollToLine = (lineNum) => {
 
 window.jumpToLine = (fileLineNum) => {
     if (!editor) return;
+    if (window.closeMobileSidebar) window.closeMobileSidebar();
     const input = document.getElementById('search-input');
     const count = document.getElementById('search-count');
     const container = document.getElementById('editor-container');

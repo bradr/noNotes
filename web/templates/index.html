@@ -223,8 +223,14 @@
         }
 
         document.getElementById('edit-save').onclick = async () => {
-            const createdAt = new Date(document.getElementById('edit-created-at').value).getTime() / 1000;
-            const modifiedAt = new Date(document.getElementById('edit-modified-at').value).getTime() / 1000;
+            const parseLocalDate = (dateStr) => {
+                if (!dateStr) return 0;
+                const parts = dateStr.split('-');
+                return new Date(parts[0], parts[1] - 1, parts[2]).getTime() / 1000;
+            };
+
+            const createdAt = parseLocalDate(document.getElementById('edit-created-at').value);
+            const modifiedAt = parseLocalDate(document.getElementById('edit-modified-at').value);
 
             const formData = new URLSearchParams();
             formData.append('line', editingLineNum);

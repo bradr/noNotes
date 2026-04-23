@@ -81,15 +81,18 @@ func canonicalize(s string) string {
 }
 
 func (idx *Indexer) UpdateTimeline(blameLines []git.BlameLine) error {
-	// 1. Fetch current created_at mappings to preserve them
+	// 1. Fetch current timestamp mappings to preserve them
 	oldCreated := make(map[string]int64)
-	rows, err := idx.db.Query("SELECT text, created_at FROM timeline")
+	oldTimestamp := make(map[string]int64)
+	rows, err := idx.db.Query("SELECT text, created_at, timestamp FROM timeline")
 	if err == nil {
 		for rows.Next() {
 			var txt string
-			var ca int64
-			if err := rows.Scan(&txt, &ca); err == nil {
-				oldCreated[canonicalize(txt)] = ca
+			var ca, ts int64
+			if err := rows.Scan(&txt, &ca, &ts); err == nil {
+				key := canonicalize(txt)
+				oldCreated[key] = ca
+				oldTimestamp[key] = ts
 			}
 		}
 		rows.Close()
@@ -114,14 +117,21 @@ func (idx *Indexer) UpdateTimeline(blameLines []git.BlameLine) error {
 
 	for _, b := range blameLines {
 		ca := b.Timestamp
-		if old, ok := oldCreated[canonicalize(b.Text)]; ok {
+		ts := b.Timestamp
+		key := canonicalize(b.Text)
+		
+		if old, ok := oldCreated[key]; ok {
 			ca = old
 		}
-		// Enforce: Created date cannot be after modified date
-		if ca > b.Timestamp {
-			ca = b.Timestamp
+		if oldTs, ok := oldTimestamp[key]; ok {
+			ts = oldTs
 		}
-		_, err = stmt.Exec(b.LineNum, b.Timestamp, ca, b.Text)
+		
+		// Enforce: Created date cannot be after modified date
+		if ca > ts {
+			ca = ts
+		}
+		_, err = stmt.Exec(b.LineNum, ts, ca, b.Text)
 		if err != nil {
 			return err
 		}
@@ -134,15 +144,17 @@ func (idx *Indexer) UpdateTimeline(blameLines []git.BlameLine) error {
 var taskRegex = regexp.MustCompile(`^- \[([ x])\] (.*)$`)
 
 func (idx *Indexer) UpdateTasks(blameLines []git.BlameLine) error {
-	// 1. Fetch current created_at mappings for tasks
+	// 1. Fetch current timestamp mappings for tasks
 	oldCreated := make(map[string]int64)
-	rows, err := idx.db.Query("SELECT text, created_at FROM tasks")
+	oldTimestamp := make(map[string]int64)
+	rows, err := idx.db.Query("SELECT text, created_at, timestamp FROM tasks")
 	if err == nil {
 		for rows.Next() {
 			var txt string
-			var ca int64
-			if err := rows.Scan(&txt, &ca); err == nil {
+			var ca, ts int64
+			if err := rows.Scan(&txt, &ca, &ts); err == nil {
 				oldCreated[txt] = ca // Task text is already stripped of [ ]
+				oldTimestamp[txt] = ts
 			}
 		}
 		rows.Close()
@@ -181,15 +193,18 @@ func (idx *Indexer) UpdateTasks(blameLines []git.BlameLine) error {
 			}
 
 			ca := b.Timestamp
+			ts := b.Timestamp
 			if old, ok := oldCreated[taskText]; ok {
 				ca = old
 			}
-			// Enforce: Created date cannot be after modified date
-			if ca > b.Timestamp {
-				ca = b.Timestamp
+			if oldTs, ok := oldTimestamp[taskText]; ok {
+				ts = oldTs
+			}
+			if ca > ts {
+				ca = ts
 			}
 
-			_, err = stmt.Exec(b.LineNum, b.Timestamp, ca, taskText, context, isDone)
+			_, err = stmt.Exec(b.LineNum, ts, ca, taskText, context, isDone)
 			if err != nil {
 				return err
 			}

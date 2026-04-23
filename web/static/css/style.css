@@ -52,6 +52,7 @@
         color: #b0b0bc !important;
     }
 }
+
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         --bg: #121214;
@@ -236,6 +237,11 @@ html {
     letter-spacing: -0.01em;
 }
 
+.cm-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
 /* Hide line numbers */
 .cm-gutters {
     display: none !important;
@@ -263,7 +269,8 @@ html {
 
 /* Search match highlighting */
 /* Search match highlighting - CodeMirror Official & Premium Look */
-.cm-searchMatch, .search-highlight {
+.cm-searchMatch,
+.search-highlight {
     background-color: rgba(255, 214, 0, 0.45) !important;
     border-radius: 4px;
     padding: 1px 2px;
@@ -275,7 +282,7 @@ html {
     font-weight: 500;
 }
 
-[data-theme="dark"] .cm-searchMatch, 
+[data-theme="dark"] .cm-searchMatch,
 [data-theme="dark"] .search-highlight {
     background-color: rgba(255, 214, 0, 0.35) !important;
     border-bottom-color: rgba(255, 214, 0, 0.6);
@@ -284,7 +291,8 @@ html {
 }
 
 .search-highlight {
-    margin: 0; /* Task highlights don't need the negative margin */
+    margin: 0;
+    /* Task highlights don't need the negative margin */
 }
 
 
@@ -308,7 +316,7 @@ html {
     font-family: var(--font-ui);
     z-index: 1000;
     white-space: nowrap;
-    opacity: 0; 
+    opacity: 0;
     transform: translateY(2px);
     transition: opacity 0.2s, transform 0.2s;
     pointer-events: auto;
@@ -960,6 +968,7 @@ html {
         opacity: 0;
         transform: scale(0.95) translateY(-10px);
     }
+
     to {
         opacity: 1;
         transform: scale(1) translateY(0);
@@ -1079,10 +1088,12 @@ html {
     cursor: pointer;
     transition: all 0.15s;
 }
+
 .btn-revert:hover:not(:disabled) {
     border-color: #f44336;
     color: #f44336;
 }
+
 .btn-revert:disabled {
     opacity: 0.5;
     cursor: default;
@@ -1097,6 +1108,7 @@ html {
         opacity: 0;
         transform: translateY(-8px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -1139,11 +1151,13 @@ html {
         opacity: 0;
         transform: scale(0.95) translateY(-10px);
     }
+
     to {
         opacity: 1;
         transform: scale(1) translateY(0);
     }
 }
+
 /* ── Sidebar Toggle states & Mobile ────────────────────────────────────────── */
 
 body.sidebar-closed #side-panel {
@@ -1193,7 +1207,7 @@ body.sidebar-closed #side-panel {
     z-index: 2500;
     color: var(--text-muted);
     transition: right 0.3s cubic-bezier(0.22, 1, 0.36, 1), transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), color 0.2s, background 0.2s;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .floating-toggle:hover {

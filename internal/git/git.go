@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -48,13 +50,43 @@ type BlameLine struct {
 func Add(repoPath, file string) error {
 	cmd := exec.Command("git", "add", file)
 	cmd.Dir = repoPath
-	return cmd.Run()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		outStr := string(bytes.TrimSpace(out))
+		if strings.Contains(outStr, "index.lock") {
+			os.Remove(filepath.Join(repoPath, ".git", "index.lock"))
+			cmd = exec.Command("git", "add", file)
+			cmd.Dir = repoPath
+			out, err = cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("retry %w: %s", err, string(bytes.TrimSpace(out)))
+			}
+			return nil
+		}
+		return fmt.Errorf("%w: %s", err, outStr)
+	}
+	return nil
 }
 
 func Commit(repoPath, msg string) error {
 	cmd := exec.Command("git", "commit", "-m", msg)
 	cmd.Dir = repoPath
-	return cmd.Run()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		outStr := string(bytes.TrimSpace(out))
+		if strings.Contains(outStr, "index.lock") {
+			os.Remove(filepath.Join(repoPath, ".git", "index.lock"))
+			cmd = exec.Command("git", "commit", "-m", msg)
+			cmd.Dir = repoPath
+			out, err = cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("retry %w: %s", err, string(bytes.TrimSpace(out)))
+			}
+			return nil
+		}
+		return fmt.Errorf("%w: %s", err, outStr)
+	}
+	return nil
 }
 
 // Blame runs `git blame -p file` returning the birth timestamp of each line.

@@ -49,7 +49,7 @@ func main() {
 	}
 	defer idx.Close()
 
-	w := watcher.New(repoPath, fileName, idx, 500*time.Millisecond, 5*time.Minute)
+	w := watcher.New(repoPath, fileName, idx, 500*time.Millisecond, 1*time.Minute)
 	if err := w.Start(); err != nil {
 		log.Fatalf("Failed to start watcher: %v", err)
 	}

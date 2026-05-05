@@ -1,6 +1,12 @@
 # noNotes
 
-noNotes is a minimalist, append-only note-taking application designed for a distraction-free writing experience. It features local SQLite-backed search, automatic file-system synchronization, and a Git-based history for every note.
+noNotes is my take on the [Append-and-Review](https://karpathy.bearblog.dev/the-append-and-review-note/) note taking philosophy. I wanted a blank canvas to capture notes and scribbles and tasks that I could just dump and not worry about organizing.
+
+I wanted something simple, fast, and something that I could use on my phone as well as my laptop. I wanted something file-based that I could use with other tools and never worry about lock-in. But I also wanted something a little more than just a file, that would capture the history of my notes and something that would compile all my tasks into one place for me to review and track.
+
+noNotes is designed to be self-hosted, centers around a single markdown file, but uses a local SQLite database for quick full-text search and tracking of tasks and a Git-based history.
+
+This is a personal project and not meant for production use.
 
 ## Features
 

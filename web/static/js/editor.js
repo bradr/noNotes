@@ -488,7 +488,39 @@ function setupSearchOverlay() {
 // ─── SSE / History ───────────────────────────────────────────────────────────
 
 try {
+    const statusDot = document.getElementById('connection-status');
+    function updateStatus(state) {
+        if (!statusDot) return;
+        statusDot.className = 'status-dot';
+        if (state === EventSource.OPEN) {
+            statusDot.classList.add('status-connected');
+            statusDot.title = 'Connected';
+        } else if (state === EventSource.CONNECTING) {
+            statusDot.classList.add('status-connecting');
+            statusDot.title = 'Connecting...';
+        } else {
+            statusDot.classList.add('status-offline');
+            statusDot.title = 'Offline';
+        }
+    }
+
     const evtSource = new EventSource('/events');
+    
+    evtSource.onopen = () => {
+        updateStatus(evtSource.readyState);
+        if (window._wasDisconnected) {
+            loadTimeline(false);
+        }
+        window._wasDisconnected = false;
+    };
+    
+    evtSource.onerror = () => {
+        updateStatus(evtSource.readyState);
+        window._wasDisconnected = true;
+    };
+
+    updateStatus(evtSource.readyState);
+
     evtSource.addEventListener('update', (e) => {
         const data = JSON.parse(e.data);
         loadTimeline(false);

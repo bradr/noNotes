@@ -1,8 +1,8 @@
-import { basicSetup, EditorView } from "https://esm.sh/codemirror@6.0.2?deps=@codemirror/view@6.38.4,@codemirror/state@6.5.2";
-import { Decoration, ViewPlugin, keymap } from "https://esm.sh/@codemirror/view@6.38.4?deps=@codemirror/state@6.5.2";
-import { StateField, StateEffect, RangeSetBuilder } from "https://esm.sh/@codemirror/state@6.5.2";
-import { markdown } from "https://esm.sh/@codemirror/lang-markdown@6.3.4?deps=@codemirror/view@6.38.4,@codemirror/state@6.5.2";
-import { indentWithTab } from "https://esm.sh/@codemirror/commands@6.7.1?deps=@codemirror/view@6.38.4,@codemirror/state@6.5.2";
+import { basicSetup, EditorView } from "https://esm.sh/codemirror@6.0.2?deps=@codemirror/view@6.42.0,@codemirror/state@6.6.0";
+import { Decoration, ViewPlugin, keymap } from "https://esm.sh/@codemirror/view@6.42.0?deps=@codemirror/state@6.6.0";
+import { StateField, StateEffect, RangeSetBuilder } from "https://esm.sh/@codemirror/state@6.6.0";
+import { markdown } from "https://esm.sh/@codemirror/lang-markdown@6.5.0?deps=@codemirror/view@6.42.0,@codemirror/state@6.6.0";
+import { indentWithTab } from "https://esm.sh/@codemirror/commands@6.10.3?deps=@codemirror/view@6.42.0,@codemirror/state@6.6.0";
 
 const setSearchTerm = StateEffect.define();
 
